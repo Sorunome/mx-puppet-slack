@@ -5,6 +5,7 @@ import {
 	IRemoteChanSend,
 	IMessageEvent,
 	IRemoteUserReceive,
+	IRemoteChanReceive,
 } from "mx-puppet-bridge";
 import { Client } from "./client";
 
@@ -29,6 +30,15 @@ export class Slack {
 			avatarUrl: user.profile.image_original,
 			name: user.profile.display_name,
 		} as IRemoteUserReceive;
+	}
+
+	public getChannelParams(puppetId: number, chan: any): IRemoteChanReceive {
+		return {
+			puppetId,
+			roomId: chan.id,
+			name: chan.name,
+			topic: chan.topic ? chan.topic.value : "",
+		} as IRemoteChanReceive;
 	}
 
 	public getSendParams(puppetId: number, data: any): IReceiveParams {
@@ -64,6 +74,11 @@ export class Slack {
 				await this.puppet.updateUser(this.getUserParams(user));
 			});
 		}
+		for (const ev of ["addChannel", "updateChannel"]) {
+			client.on(ev, async (chan) => {
+				await this.puppet.updateChannel(this.getChannelParams(puppetId, chan));
+			});
+		}
 		this.puppets[puppetId] = {
 			client,
 			data,
@@ -76,5 +91,26 @@ export class Slack {
 			return;
 		}
 		await this.puppets[room.puppetId].client.sendMessage(data.body, room.roomId);
+	}
+
+	public async updateChannel(puppetId: number, cid: string) {
+		const p = this.puppets[puppetId];
+		if (!p) {
+			return;
+		}
+		let chan = await p.client.getChannelById(cid);
+		await this.puppet.updateChannel(this.getChannelParams(puppetId, chan))
+	}
+
+	public async updateUser(puppetId: number, uid: string) {
+		const p = this.puppets[puppetId];
+		if (!p) {
+			return;
+		}
+		let user = await p.client.getUserById(uid);
+		if (!user) {
+			user = await p.client.getBotById(uid);
+		}
+		await this.puppet.updateUser(this.getUserParams(user));
 	}
 }

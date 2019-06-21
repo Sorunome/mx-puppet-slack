@@ -63,6 +63,8 @@ async function run() {
 	const slack = new Slack(puppet);
 	puppet.on("puppetAdd", slack.addPuppet.bind(slack));
 	puppet.on("message", slack.handleMatrixMessage.bind(slack));
+	puppet.on("updateChannel", slack.updateChannel.bind(slack));
+	puppet.on("updateUser", slack.updateUser.bind(slack));
 	await puppet.start();
 }
 
