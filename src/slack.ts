@@ -4,16 +4,15 @@ import {
 	IReceiveParams,
 	IRemoteChanSend,
 	IMessageEvent,
+	IRemoteUserReceive,
 } from "mx-puppet-bridge";
-import { RTMClient } from "@slack/rtm-api";
-import { WebClient } from "@slack/web-api";
+import { Client } from "./client";
 
 const log = new Log("SlackPuppet:slack");
 
 interface ISlackPuppets {
 	[puppetId: number]: {
-		rtm: RTMClient;
-		web: WebClient;
+		client: Client;
 		data: any;
 	}
 }
@@ -23,6 +22,14 @@ export class Slack {
 	constructor(
 		private puppet: PuppetBridge,
 	) { }
+
+	public getUserParams(user: any): IRemoteUserReceive {
+		return {
+			userId: user.id,
+			avatarUrl: user.profile.image_original,
+			name: user.profile.display_name,
+		} as IRemoteUserReceive;
+	}
 
 	public getSendParams(puppetId: number, data: any): IReceiveParams {
 		return {
@@ -46,25 +53,28 @@ export class Slack {
 		if (this.puppets[puppetId]) {
 			await this.removePuppet(puppetId);
 		}
-		const rtm = new RTMClient(data.token);
-		const web = new WebClient(data.token);
-		rtm.on("message", async (data) => {
+		const client = new Client(data.token);
+		client.on("message", async (data) => {
 			log.verbose("Got new message event");
 			const params = this.getSendParams(puppetId, data);
-			this.puppet.sendMessage(params, data.text);
+			await this.puppet.sendMessage(params, data.text);
 		});
-		rtm.start();
+		for (const ev of ["addUser", "updateUser", "updateBot"]) {
+			client.on(ev, async (user) => {
+				await this.puppet.updateUser(this.getUserParams(user));
+			});
+		}
 		this.puppets[puppetId] = {
-			rtm,
-			web,
+			client,
 			data,
 		} as any;//ISlackPuppets;
+		await client.connect();
 	}
 
 	public async handleMatrixMessage(room: IRemoteChanSend, data: IMessageEvent, event: any) {
 		if (!this.puppets[room.puppetId]) {
 			return;
 		}
-		await this.puppets[room.puppetId].rtm.sendMessage(data.body, room.roomId);
+		await this.puppets[room.puppetId].client.sendMessage(data.body, room.roomId);
 	}
 }
