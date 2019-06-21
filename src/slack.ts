@@ -8,8 +8,13 @@ import {
 	IRemoteChanReceive,
 } from "mx-puppet-bridge";
 import { Client } from "./client";
+import * as Markdown from "markdown-it";
+import * as MarkdownSlack from "markdown-it-slack";
 
 const log = new Log("SlackPuppet:slack");
+
+const md = Markdown();
+md.use(MarkdownSlack);
 
 interface ISlackPuppets {
 	[puppetId: number]: {
@@ -66,8 +71,7 @@ export class Slack {
 		const client = new Client(data.token);
 		client.on("message", async (data) => {
 			log.verbose("Got new message event");
-			const params = this.getSendParams(puppetId, data);
-			await this.puppet.sendMessage(params, data.text);
+			await this.handleSlackMessage(puppetId, data);
 		});
 		for (const ev of ["addUser", "updateUser", "updateBot"]) {
 			client.on(ev, async (user) => {
@@ -84,6 +88,14 @@ export class Slack {
 			data,
 		} as any;//ISlackPuppets;
 		await client.connect();
+	}
+
+	public async handleSlackMessage(puppetId: number, data: any) {
+		const params = this.getSendParams(puppetId, data);
+		if (data.files) {
+			// this has files
+		}
+		await this.puppet.sendMessage(params, data.text, md.render(data.text));
 	}
 
 	public async handleMatrixMessage(room: IRemoteChanSend, data: IMessageEvent, event: any) {
