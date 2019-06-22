@@ -51,11 +51,18 @@ export class Slack {
 	}
 
 	public getChannelParams(puppetId: number, chan: any): IRemoteChanReceive {
+		if (chan.isDirect) {
+			return {
+				puppetId,
+				roomId: chan.id,
+			} as IRemoteChanReceive;
+		}
 		return {
 			puppetId,
 			roomId: chan.id,
 			name: chan.name,
 			topic: chan.topic ? chan.topic.value : "",
+			dm: chan.isDirect,
 		} as IRemoteChanReceive;
 	}
 
@@ -192,8 +199,10 @@ export class Slack {
 			return;
 		}
 		log.info(`Received request for channel update puppetId=${puppetId} cid=${cid}`);
-		let chan = await p.client.getChannelById(cid);
-		await this.puppet.updateChannel(this.getChannelParams(puppetId, chan))
+		let chan = await p.client.getRoomById(cid);
+		if (chan) {
+			await this.puppet.updateChannel(this.getChannelParams(puppetId, chan))
+		}
 	}
 
 	public async updateUser(puppetId: number, uid: string) {
@@ -206,6 +215,8 @@ export class Slack {
 		if (!user) {
 			user = await p.client.getBotById(uid);
 		}
-		await this.puppet.updateUser(this.getUserParams(user));
+		if (user) {
+			await this.puppet.updateUser(this.getUserParams(user));
+		}
 	}
 }

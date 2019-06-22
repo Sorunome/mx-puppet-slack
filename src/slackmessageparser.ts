@@ -61,18 +61,24 @@ export class SlackMessageParser {
 				});
 			});
 		}
+		// combind the messages
 		let rawMessage = messages
 			.filter(m => m && (typeof m === "string"))
 			.map(m => m.trim())
 			.join('\n')
 			.trim();
+		// insert @room in place of <!channel> and <!here>
+		rawMessage = rawMessage.replace(/<!channel>/g, "@room");
+		rawMessage = rawMessage.replace(/<!here>/g, "@room");
 		let msg = rawMessage;
 		let html = md.render(msg);
+		// insert the colour hacks
 		html = html.replace(/;BEGIN_FONT_COLOR_HACK_(.*?);/g, '<font color="$1">');
 		html = html.replace(/;END_FONT_COLOR_HACK;/g, '</font>');
 		msg = msg.replace(/;BEGIN_FONT_COLOR_HACK_(.*?);/g, '');
 		msg = msg.replace(/;END_FONT_COLOR_HACK;/g, '');
 
+		// replace user mentions
 		let result = null as RegExpExecArray | null;
 		while ((result = /<@([a-zA-Z0-9]*)>/g.exec(msg)) !== null) {
 			const u = result[1];
