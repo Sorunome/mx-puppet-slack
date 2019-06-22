@@ -30,9 +30,24 @@ export class Slack {
 	) { }
 
 	public getUserParams(user: any): IRemoteUserReceive {
+		// get the rigth avatar url
+		const imageKey = Object.keys(user.profile).filter((el) => {
+			return el.startsWith("image_");
+		}).sort((e1, e2) => {
+			const n1 = Number(e1.substring("image_".length));
+			const n2 = Number(e2.substring("image_".length));
+			if (isNaN(n1)) {
+				return -1;
+			}
+			if (isNaN(n2)) {
+				return 1;
+			}
+			return n2 - n1;
+		})[0];
+		log.verbose(`Determined avatar url ${imageKey}`);
 		return {
 			userId: user.id,
-			avatarUrl: user.profile.image_original,
+			avatarUrl: user.profile[imageKey],
 			name: user.profile.display_name,
 		} as IRemoteUserReceive;
 	}
@@ -95,7 +110,7 @@ export class Slack {
 		if (data.files) {
 			// this has files
 		}
-		await this.puppet.sendMessage(params, data.text, md.render(data.text));
+		await this.puppet.sendMessage(params, data.text, md.render(data.text), data.subtype === "me_message");
 	}
 
 	public async handleMatrixMessage(room: IRemoteChanSend, data: IMessageEvent, event: any) {
@@ -110,6 +125,7 @@ export class Slack {
 		if (!p) {
 			return;
 		}
+		log.info(`Received request for channel update puppetId=${puppetId} cid=${cid}`);
 		let chan = await p.client.getChannelById(cid);
 		await this.puppet.updateChannel(this.getChannelParams(puppetId, chan))
 	}
@@ -119,6 +135,7 @@ export class Slack {
 		if (!p) {
 			return;
 		}
+		log.info(`Received request for user update puppetId=${puppetId} uid=${uid}`);
 		let user = await p.client.getUserById(uid);
 		if (!user) {
 			user = await p.client.getBotById(uid);
