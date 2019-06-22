@@ -129,10 +129,11 @@ export class Slack {
 
 	public async handleSlackMessage(puppetId: number, data: any) {
 		const params = this.getSendParams(puppetId, data);
+		const client = this.puppets[puppetId].client;
 		const parserOpts = {
 			puppetId,
 			puppet: this.puppet,
-			client: this.puppets[puppetId].client,
+			client,
 		} as ISlackMessageParserOpts;
 		if (data.subtype === "message_changed") {
 			if (data.message.text === data.previous_message.text) {
@@ -146,19 +147,36 @@ export class Slack {
 			});
 			return;
 		}
+		if (data.text) {
+			// send a normal message, if present
+			const { msg, html } = await SlackMessageParser.parse(parserOpts, data.text, data.attachments);
+			await this.puppet.sendMessage(params, {
+				body: msg,
+				formatted_body: html,
+				emote: data.subtype === "me_message",
+			});
+		}
 		if (data.files) {
 			// this has files
-			let promises = [];
-			if (data.text) {
-				
+			for (const f of data.files) {
+				try {
+					const buffer = await client.downloadFile(f.url_private);
+					await this.puppet.sendFileDetect(params, buffer, f.name);
+				} catch (err) {
+					await this.puppet.sendMessage(params, {
+						body: `sent a file: ${f.url_private}`,
+						action: true,
+					});
+				}
+				if (f.initial_comment) {
+					const { msg, html } = await SlackMessageParser.parse(parserOpts, f.initial_comment);
+					await this.puppet.sendMessage(params, {
+						body: msg,
+						formatted_body: html,
+					});
+				}
 			}
 		}
-		const { msg, html } = await SlackMessageParser.parse(parserOpts, data.text);
-		await this.puppet.sendMessage(params, {
-			body: msg,
-			formatted_body: html,
-			emote: data.subtype === "me_message",
-		} as ISendMessageOpts);
 	}
 
 	public async handleMatrixMessage(room: IRemoteChanSend, data: IMessageEvent, event: any) {

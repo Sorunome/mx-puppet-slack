@@ -68,9 +68,6 @@ export class SlackMessageParser {
 			.trim();
 		let msg = rawMessage;
 		let html = md.render(msg);
-		console.log("=======");
-		console.log(msg);
-		console.log(html);
 		html = html.replace(/;BEGIN_FONT_COLOR_HACK_(.*?);/g, '<font color="$1">');
 		html = html.replace(/;END_FONT_COLOR_HACK;/g, '</font>');
 		msg = msg.replace(/;BEGIN_FONT_COLOR_HACK_(.*?);/g, '');
