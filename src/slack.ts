@@ -6,15 +6,13 @@ import {
 	IMessageEvent,
 	IRemoteUserReceive,
 	IRemoteChanReceive,
+	ISendMessageOpts,
+	Util,
 } from "mx-puppet-bridge";
+import { SlackMessageParser, ISlackMessageParserOpts } from "./slackmessageparser";
 import { Client } from "./client";
-import * as Markdown from "markdown-it";
-import * as MarkdownSlack from "markdown-it-slack";
 
 const log = new Log("SlackPuppet:slack");
-
-const md = Markdown();
-md.use(MarkdownSlack);
 
 interface ISlackPuppets {
 	[puppetId: number]: {
@@ -78,12 +76,21 @@ export class Slack {
 		delete this.puppets[puppetId];
 	}
 
-	public async addPuppet(puppetId: number, data: any) {
-		log.info(`Adding new Puppet: puppetId=${puppetId}`);
-		if (this.puppets[puppetId]) {
-			await this.removePuppet(puppetId);
+	public async startClient(puppetId: number) {
+		const p = this.puppets[puppetId];
+		if (!p) {
+			return;
 		}
-		const client = new Client(data.token);
+		const client = new Client(p.data.token);
+		client.on("disconnected", async () => {
+			log.info(`Lost connection for puppet ${puppetId}, reconnecting in a minute...`);
+			await Util.sleep(60 * 1000);
+			try {
+				await this.startClient(puppetId);
+			} catch (err) {
+				log.warn("Failed to restart client", err);
+			}
+		})
 		client.on("message", async (data) => {
 			log.verbose("Got new message event");
 			await this.handleSlackMessage(puppetId, data);
@@ -98,19 +105,60 @@ export class Slack {
 				await this.puppet.updateChannel(this.getChannelParams(puppetId, chan));
 			});
 		}
+		p.client = client;
+		try {
+			await client.connect();
+		} catch (err) {
+			log.warn("Failed to connect client", err);
+			throw err;
+		}
+	}
+
+	public async addPuppet(puppetId: number, data: any) {
+		log.info(`Adding new Puppet: puppetId=${puppetId}`);
+		if (this.puppets[puppetId]) {
+			await this.removePuppet(puppetId);
+		}
+		const client = new Client(data.token);
 		this.puppets[puppetId] = {
 			client,
 			data,
 		} as any;//ISlackPuppets;
-		await client.connect();
+		await this.startClient(puppetId);
 	}
 
 	public async handleSlackMessage(puppetId: number, data: any) {
 		const params = this.getSendParams(puppetId, data);
+		const parserOpts = {
+			puppetId,
+			puppet: this.puppet,
+			client: this.puppets[puppetId].client,
+		} as ISlackMessageParserOpts;
+		if (data.subtype === "message_changed") {
+			if (data.message.text === data.previous_message.text) {
+				// nothing to do
+				return;
+			}
+			const { msg, html } = await SlackMessageParser.parse(parserOpts, `Edit: ${data.message.text}`);
+			await this.puppet.sendMessage(params, {
+				body: msg,
+				formatted_body: html,
+			});
+			return;
+		}
 		if (data.files) {
 			// this has files
+			let promises = [];
+			if (data.text) {
+				
+			}
 		}
-		await this.puppet.sendMessage(params, data.text, md.render(data.text), data.subtype === "me_message");
+		const { msg, html } = await SlackMessageParser.parse(parserOpts, data.text);
+		await this.puppet.sendMessage(params, {
+			body: msg,
+			formatted_body: html,
+			emote: data.subtype === "me_message",
+		} as ISendMessageOpts);
 	}
 
 	public async handleMatrixMessage(room: IRemoteChanSend, data: IMessageEvent, event: any) {

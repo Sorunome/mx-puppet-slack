@@ -295,4 +295,27 @@ export class Client extends EventEmitter {
 	public getChannels(): any {
 		return this.data.channels;
 	}
+
+	public async sendFileMessage(fileUrl: string, title: string, filename: string, channel?: string) {
+		if (!channel) {
+			// three parameters, meaning title == filename
+			channel = filename;
+			filename = title;
+		}
+		const buffer = await Util.DownloadFile(fileUrl);
+		const opts = {
+			filename,
+			file: buffer,
+			title,
+			filetype: "auto",
+			channels: channel,
+		};
+		await this.web.files.upload(opts);
+	}
+
+	public async downloadFile(url: string): Promise<Buffer> {
+		return await Util.DownloadFile(url, {
+			headers: { Authorization: `Bearer ${this.token}` },
+		});
+	}
 }
