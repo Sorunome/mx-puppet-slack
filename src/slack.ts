@@ -7,6 +7,7 @@ import {
 	IRemoteUserReceive,
 	IRemoteChanReceive,
 	ISendMessageOpts,
+	IFileEvent,
 	Util,
 } from "mx-puppet-bridge";
 import { SlackMessageParser, ISlackMessageParserOpts } from "./slackmessageparser";
@@ -110,6 +111,7 @@ export class Slack {
 		}
 		for (const ev of ["addChannel", "updateChannel"]) {
 			client.on(ev, async (chan) => {
+				log.verbose("Received slack event to update channel:", ev);
 				await this.puppet.updateChannel(this.getChannelParams(puppetId, chan));
 			});
 		}
@@ -192,6 +194,13 @@ export class Slack {
 			return;
 		}
 		await this.puppets[room.puppetId].client.sendMessage(data.body, room.roomId);
+	}
+
+	public async handleMatrixFile(room: IRemoteChanSend, data: IFileEvent, event: any) {
+		if (!this.puppets[room.puppetId]) {
+			return;
+		}
+		await this.puppets[room.puppetId].client.sendFileMessage(data.url, data.filename, room.roomId);
 	}
 
 	public async createChan(puppetId: number, cid: string): Promise<IRemoteChanReceive | null> {

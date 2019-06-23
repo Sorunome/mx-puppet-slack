@@ -38,7 +38,7 @@ if (options.help) {
 }
 
 const features = {
-	
+	file: true, // no need for the others as we auto-detect types anyways
 } as IPuppetBridgeFeatures;
 
 const puppet = new PuppetBridge(options["registration-file"], options.config, features);
@@ -63,6 +63,7 @@ async function run() {
 	const slack = new Slack(puppet);
 	puppet.on("puppetAdd", slack.addPuppet.bind(slack));
 	puppet.on("message", slack.handleMatrixMessage.bind(slack));
+	puppet.on("file", slack.handleMatrixFile.bind(slack));
 	puppet.setCreateChanHook(slack.createChan.bind(slack));
 	puppet.setCreateUserHook(slack.createUser.bind(slack));
 	await puppet.start();
