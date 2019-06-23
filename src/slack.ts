@@ -55,6 +55,7 @@ export class Slack {
 			return {
 				puppetId,
 				roomId: chan.id,
+				isDirect: true,
 			} as IRemoteChanReceive;
 		}
 		return {
@@ -62,7 +63,7 @@ export class Slack {
 			roomId: chan.id,
 			name: chan.name,
 			topic: chan.topic ? chan.topic.value : "",
-			dm: chan.isDirect,
+			isDirect: false,
 		} as IRemoteChanReceive;
 	}
 
@@ -193,30 +194,32 @@ export class Slack {
 		await this.puppets[room.puppetId].client.sendMessage(data.body, room.roomId);
 	}
 
-	public async updateChannel(puppetId: number, cid: string) {
+	public async createChan(puppetId: number, cid: string): Promise<IRemoteChanReceive | null> {
 		const p = this.puppets[puppetId];
 		if (!p) {
-			return;
+			return null;
 		}
-		log.info(`Received request for channel update puppetId=${puppetId} cid=${cid}`);
+		log.info(`Received create request for channel update puppetId=${puppetId} cid=${cid}`);
 		let chan = await p.client.getRoomById(cid);
-		if (chan) {
-			await this.puppet.updateChannel(this.getChannelParams(puppetId, chan))
+		if (!chan) {
+			return null;
 		}
+		return this.getChannelParams(puppetId, chan);
 	}
 
-	public async updateUser(puppetId: number, uid: string) {
+	public async createUser(puppetId: number, uid: string): Promise<IRemoteUserReceive | null> {
 		const p = this.puppets[puppetId];
 		if (!p) {
-			return;
+			return null;
 		}
-		log.info(`Received request for user update puppetId=${puppetId} uid=${uid}`);
+		log.info(`Received create request for user update puppetId=${puppetId} uid=${uid}`);
 		let user = await p.client.getUserById(uid);
 		if (!user) {
 			user = await p.client.getBotById(uid);
 		}
-		if (user) {
-			await this.puppet.updateUser(this.getUserParams(user));
+		if (!user) {
+			return null;
 		}
+		return this.getUserParams(user);
 	}
 }
