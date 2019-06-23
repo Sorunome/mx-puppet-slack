@@ -1,10 +1,12 @@
 // taken largely from https://github.com/matrix-hacks/matrix-puppet-slack/blob/master/client.js
-import { Log, Util } from "mx-puppet-bridge";
+import { Log, Util, Lock } from "mx-puppet-bridge";
 import { RTMClient } from "@slack/rtm-api";
 import { WebClient } from "@slack/web-api";
 import { EventEmitter } from "events";
 
 const log = new Log("SlackPuppet:client");
+
+const FETCH_LOCK_TIMEOUT = 1000 * 60;
 
 interface ILock {
 	id: number;
@@ -23,8 +25,7 @@ export class Client extends EventEmitter {
 	private rtm: RTMClient;
 	private web: WebClient;
 	private data: IClientData = {};
-	private lockId: number = 0;
-	private locks: ILocks = {};
+	private lock: Lock<string>;
 	constructor(
 		private token: string,
 	) {
@@ -34,6 +35,7 @@ export class Client extends EventEmitter {
 		this.data.channels = [];
 		this.data.users = [];
 		this.data.bots = [];
+		this.lock = new Lock(FETCH_LOCK_TIMEOUT);
 	}
 
 	public async connect(): Promise<void> {
@@ -57,6 +59,7 @@ export class Client extends EventEmitter {
 			this.rtm.on("authenticated", (rtmStartData) => {
 				log.verbose(`Logged in as ${rtmStartData.self.name} of team ${rtmStartData.team.name}`);
 				this.data.self = rtmStartData.self;
+				this.emit("authenticated", rtmStartData);
 			});
 
 			this.rtm.on("ready", () => {
@@ -111,65 +114,23 @@ export class Client extends EventEmitter {
 		return this.data.self.id;
 	}
 
-	public acquireFetchLock(group: string, subKey: string): number {
-		const key = `${group}_${subKey}`;
-		if (this.locks[key]) {
-			return -1;
-		}
-		// release after 1min
-		const lockId = ++this.lockId;
-		if (this.lockId > 1000000) {
-			this.lockId = 0;
-		}
-		this.locks[key] = {
-			id: lockId,
-			timer: setTimeout(() => {
-				if (this.locks[key] && this.locks[key].id === lockId) {
-					delete this.locks[key];
-				}
-			}, 60000),
-		};
-		return lockId;
-	}
-
-	public releaseFetchLock(group: string, subKey: string, id: number) {
-		const key = `${group}_${subKey}`;
-		if (!this.locks[key]) {
-			return;
-		}
-		if (this.locks[key].id !== id) {
-			return;
-		}
-		clearTimeout(this.locks[key].timer);
-		delete this.locks[key];
-	}
-
-	public isAliveFetchLock(group: string, subKey: string) {
-		const key = `${group}_${subKey}`;
-		return Boolean(this.locks[key]);
-	}
-
 	public async getBotById(id: string): Promise<any> {
 		let bot = this.data.bots.find(u => (u.id === id || u.name === id));
 		if (bot) {
 			return bot;
 		}
-		const lockId = this.acquireFetchLock('bot', id);
-		if (lockId < 0) {
-			while (this.isAliveFetchLock('bot', id)) {
-				await Util.sleep(100);
-			}
-			return await this.getBotById(id);
-		}
+		const lockKey = `bot_${id}`;
+		await this.lock.wait(lockKey);
+		this.lock.set(lockKey);
 		try {
 			const ret = await this.web.bots.info({ bot: id });
 			this.updateBot(ret.bot);
-			this.releaseFetchLock('bot', id, lockId);
+			this.lock.release(lockKey);
 			return ret.bot;
 		} catch (err) {
 			log.verbose('could not fetch the bot info', err.message);
 		}
-		this.releaseFetchLock('bot', id, lockId);
+		this.lock.release(lockKey);
 		return { name: "unknown" };
 	}
 
@@ -178,22 +139,18 @@ export class Client extends EventEmitter {
 		if (user) {
 			return user;
 		}
-		const lockId = this.acquireFetchLock('user', id);
-		if (lockId < 0) {
-			while (this.isAliveFetchLock('user', id)) {
-				await Util.sleep(100);
-			}
-			return await this.getUserById(id);
-		}
+		const lockKey = `user_${id}`;
+		await this.lock.wait(lockKey);
+		this.lock.set(lockKey);
 		try {
 			const ret = await this.web.users.info({ user: id });
 			this.updateUser(ret.user);
-			this.releaseFetchLock('user', id, lockId);
+			this.lock.release(lockKey);
 			return ret.user;
 		} catch (err) {
 			log.verbose('could not fetch the user info', err.message);
 		}
-		this.releaseFetchLock('user', id, lockId);
+		this.lock.release(lockKey);
 		return null;
 	}
 
@@ -208,25 +165,21 @@ export class Client extends EventEmitter {
 	public async getRoomById(id: string): Promise<any> {
 		let chan = this.data.channels.find(c => (c.id === id || c.name === id));
 		if (!chan) {
-			const lockId = this.acquireFetchLock('chan', id);
-			if (lockId < 0) {
-				while (this.isAliveFetchLock('chan', id)) {
-					await Util.sleep(100);
-				}
-				return await this.getRoomById(id);
-			}
+			const lockKey = `chan_${id}`;
+			await this.lock.wait(lockKey);
+			this.lock.set(lockKey);
 			try {
 				const ret = await this.web.conversations.info({ channel: id });
 				if (!ret.channel) {
-					this.releaseFetchLock('chan', id, lockId);
+					this.lock.release(lockKey);
 					return null;
 				}
 				this.updateChannel(ret.channel);
-				this.releaseFetchLock('chan', id, lockId);
+				this.lock.release(lockKey);
 				chan = ret.channel;
 			} catch (err) {
 				log.verbose('could not fetch the conversation info', err.message);
-				this.releaseFetchLock('chan', id, lockId);
+				this.lock.release(lockKey);
 				return null;
 			}
 		}
@@ -234,6 +187,16 @@ export class Client extends EventEmitter {
 			chan.isDirect = !!chan.is_im;
 		}
 		return chan;
+	}
+
+	public async getTeamById(id: string): Promise<any> {
+		try {
+			// as any, because web api doesn't know of team objects 
+			return ((await this.web.team.info({ team: id })) as any).team;
+		} catch (err) {
+			log.verbose('could not fetch the team info', err.message);
+			return null;
+		}
 	}
 
 	public updateUser(user) {
