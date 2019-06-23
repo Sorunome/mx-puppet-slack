@@ -12,6 +12,7 @@ import {
 } from "mx-puppet-bridge";
 import { SlackMessageParser, ISlackMessageParserOpts } from "./slackmessageparser";
 import { Client } from "./client";
+import { MatrixMessageProcessor, IMatrixMessageParserOpts } from "./matrixmessageprocessor";
 
 const log = new Log("SlackPuppet:slack");
 
@@ -29,17 +30,32 @@ export class Slack {
 	) { }
 
 	public getUserParams(user: any): IRemoteUserReceive {
-		// get the rigth avatar url
-		const imageKey = this.getImageKeyFromObject(user.profile);
+		// check if we have a user
+		if (user.profile) {
+			// get the rigth avatar url
+			const imageKey = this.getImageKeyFromObject(user.profile);
+			let avatarUrl = "";
+			if (imageKey) {
+				avatarUrl = user.profile[imageKey];
+			}
+			log.verbose(`Determined avatar url ${imageKey}`);
+			return {
+				userId: user.id,
+				avatarUrl,
+				name: user.profile.display_name,
+			} as IRemoteUserReceive;
+		}
+		// okay, we have a bot
+		const imageKey = this.getImageKeyFromObject(user.icons);
 		let avatarUrl = "";
 		if (imageKey) {
-			avatarUrl = user.profile[imageKey];
+			avatarUrl = user.icons[imageKey];
 		}
 		log.verbose(`Determined avatar url ${imageKey}`);
 		return {
 			userId: user.id,
 			avatarUrl,
-			name: user.profile.display_name,
+			name: user.name,
 		} as IRemoteUserReceive;
 	}
 
@@ -53,6 +69,7 @@ export class Slack {
 		}
 		const p = this.puppets[puppetId];
 		let avatarUrl = "";
+		let name = chan.name;
 		if (p && p.data.team) {
 			const team = await p.client.getTeamById(p.data.team.id);
 			if (team) {
@@ -60,12 +77,13 @@ export class Slack {
 				if (imageKey) {
 					avatarUrl = team.icon[imageKey];
 				}
+				name += ` - ${team.name}`;
 			}
 		}
 		return {
 			puppetId,
 			roomId: chan.id,
-			name: chan.name,
+			name,
 			avatarUrl,
 			topic: chan.topic ? chan.topic.value : "",
 			isDirect: false,
@@ -73,13 +91,15 @@ export class Slack {
 	}
 
 	public getSendParams(puppetId: number, data: any): IReceiveParams {
+		log.verbose("+++++++++++");
+		log.verbose(data);
 		return {
 			chan: {
 				roomId: data.channel,
 				puppetId: puppetId,
 			},
 			user: {
-				userId: data.user,
+				userId: data.user || data.bot_id,
 			},
 		} as IReceiveParams;
 	}
@@ -209,10 +229,17 @@ export class Slack {
 	}
 
 	public async handleMatrixMessage(room: IRemoteChanSend, data: IMessageEvent, event: any) {
-		if (!this.puppets[room.puppetId]) {
+		const p = this.puppets[room.puppetId];
+		if (!p) {
 			return;
 		}
-		await this.puppets[room.puppetId].client.sendMessage(data.body, room.roomId);
+		const msg = await MatrixMessageProcessor.parse({}, data);
+		log.verbose(data.msgtype);
+		if (data.emote) {
+			await p.client.sendMessage(`_${msg}_`, room.roomId);
+		} else {
+			await p.client.sendMessage(msg, room.roomId);
+		}
 	}
 
 	public async handleMatrixFile(room: IRemoteChanSend, data: IFileEvent, event: any) {
