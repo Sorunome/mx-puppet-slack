@@ -38,6 +38,10 @@ export class Client extends EventEmitter {
 		this.lock = new Lock(FETCH_LOCK_TIMEOUT);
 	}
 
+	public async disconnect(): Promise<void> {
+		await this.rtm.disconnect();
+	}
+
 	public async connect(): Promise<void> {
 		return new Promise((resolve, reject) => {
 			// we couldn't start up successfully, reject this.

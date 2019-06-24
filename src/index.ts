@@ -63,7 +63,8 @@ if (options.register) {
 async function run() {
 	await puppet.init();
 	const slack = new Slack(puppet);
-	puppet.on("puppetNew", slack.addPuppet.bind(slack));
+	puppet.on("puppetNew", slack.newPuppet.bind(slack));
+	puppet.on("puppetDelete", slack.deletePuppet.bind(slack));
 	puppet.on("message", slack.handleMatrixMessage.bind(slack));
 	puppet.on("file", slack.handleMatrixFile.bind(slack));
 	puppet.setCreateChanHook(slack.createChan.bind(slack));

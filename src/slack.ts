@@ -20,6 +20,7 @@ interface ISlackPuppets {
 	[puppetId: number]: {
 		client: Client;
 		data: any;
+		clientStopped: boolean;
 	}
 }
 
@@ -91,8 +92,6 @@ export class Slack {
 	}
 
 	public getSendParams(puppetId: number, data: any): IReceiveParams {
-		log.verbose("+++++++++++");
-		log.verbose(data);
 		return {
 			chan: {
 				roomId: data.channel,
@@ -107,6 +106,15 @@ export class Slack {
 	public async removePuppet(puppetId: number) {
 		log.info(`Removing puppet: puppetId=${puppetId}`);
 		delete this.puppets[puppetId];
+	}
+
+	public async stopClient(puppetId: number) {
+		const p = this.puppets[puppetId];
+		if (!p) {
+			return;
+		}
+		p.clientStopped = true;
+		await p.client.disconnect();
 	}
 
 	public async startClient(puppetId: number) {
@@ -131,6 +139,9 @@ export class Slack {
 			await this.puppet.setPuppetData(puppetId, d);
 		});
 		client.on("disconnected", async () => {
+			if (p.clientStopped) {
+				return;
+			}
 			log.info(`Lost connection for puppet ${puppetId}, reconnecting in a minute...`);
 			await Util.sleep(60 * 1000);
 			try {
@@ -163,7 +174,7 @@ export class Slack {
 		}
 	}
 
-	public async addPuppet(puppetId: number, data: any) {
+	public async newPuppet(puppetId: number, data: any) {
 		log.info(`Adding new Puppet: puppetId=${puppetId}`);
 		if (this.puppets[puppetId]) {
 			await this.removePuppet(puppetId);
@@ -172,8 +183,15 @@ export class Slack {
 		this.puppets[puppetId] = {
 			client,
 			data,
+			clientStopped: false,
 		} as any;//ISlackPuppets;
 		await this.startClient(puppetId);
+	}
+
+	public async deletePuppet(puppetId: number) {
+		log.info(`Got signal to quit Puppet: puppetId=${puppetId}`);
+		await this.stopClient(puppetId);
+		await this.removePuppet(puppetId);
 	}
 
 	public async handleSlackMessage(puppetId: number, data: any) {
