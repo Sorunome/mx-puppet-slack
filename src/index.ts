@@ -3,10 +3,12 @@ import {
 	IPuppetBridgeFeatures,
 	IPuppetBridgeRegOpts,
 	Log,
+	IRetData,
 } from "mx-puppet-bridge";
 import * as commandLineArgs from "command-line-args";
 import * as commandLineUsage from "command-line-usage";
 import { Slack } from "./slack";
+import * as escapeHtml from "escape-html";
 
 const log = new Log("SlackPuppet:index");
 
@@ -61,11 +63,48 @@ if (options.register) {
 async function run() {
 	await puppet.init();
 	const slack = new Slack(puppet);
-	puppet.on("puppetAdd", slack.addPuppet.bind(slack));
+	puppet.on("puppetNew", slack.addPuppet.bind(slack));
 	puppet.on("message", slack.handleMatrixMessage.bind(slack));
 	puppet.on("file", slack.handleMatrixFile.bind(slack));
 	puppet.setCreateChanHook(slack.createChan.bind(slack));
 	puppet.setCreateUserHook(slack.createUser.bind(slack));
+	puppet.setGetDescHook((puppetId: number, data: any, html: boolean): string => {
+		let s = "Slack";
+		if (data.team) {
+			const name = data.team.name;
+			if (html) {
+				s += ` on <code>${escapeHtml(name)}</code>`;
+			} else {
+				s += ` on "${name}"`;
+			}
+		}
+		if (data.self) {
+			const name = data.self.name;
+			if (html) {
+				s += ` as <code>${escapeHtml(name)}`;
+			} else {
+				s += ` as "${name}"`;
+			}
+		}
+		return s;
+	});
+	puppet.setGetDastaFromStrHook((str: string): IRetData => {
+		const retData = {
+			success: false,
+		} as IRetData;
+		if (!str) {
+			retData.error = "Please specify a token to link!";
+			return retData;
+		}
+		retData.success = true;
+		retData.data = {
+			token: str.trim(),
+		};
+		return retData;
+	});
+	puppet.setBotHeaderMsgHook((): string => {
+		return "Slack Puppet Bridge";
+	});
 	await puppet.start();
 }
 
