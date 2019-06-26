@@ -63,7 +63,8 @@ export class Slack {
 	}
 
 	public async getChannelParams(puppetId: number, chan: any): IRemoteChanReceive {
-		if (chan.isDirect) {
+		log.silly(chan);
+		if (chan.is_im) {
 			return {
 				puppetId,
 				roomId: chan.id,
