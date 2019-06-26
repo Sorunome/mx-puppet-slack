@@ -63,7 +63,6 @@ export class Slack {
 	}
 
 	public async getChannelParams(puppetId: number, chan: any): IRemoteChanReceive {
-		log.silly(chan);
 		if (chan.is_im) {
 			return {
 				puppetId,
@@ -230,6 +229,10 @@ export class Slack {
 		if (data.files) {
 			// this has files
 			for (const f of data.files) {
+				if (f.title && f.title.startsWith("\ufff0")) {
+					// skip this, we sent it!
+					continue;
+				}
 				try {
 					const buffer = await client.downloadFile(f.url_private);
 					await this.puppet.sendFileDetect(params, buffer, f.name);
@@ -256,7 +259,6 @@ export class Slack {
 			return;
 		}
 		const msg = await MatrixMessageProcessor.parse({}, data);
-		log.verbose(data.msgtype);
 		if (data.emote) {
 			await p.client.sendMessage(`_${msg}_`, room.roomId);
 		} else {

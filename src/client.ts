@@ -273,7 +273,7 @@ export class Client extends EventEmitter {
 		const opts = {
 			filename,
 			file: buffer,
-			title,
+			title: `\ufff0${title}`,
 			filetype: "auto",
 			channels: channel,
 		};
