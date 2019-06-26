@@ -172,6 +172,28 @@ export class Slack {
 			const params = this.getSendParams(puppetId, data);
 			await this.puppet.setUserTyping(params, isTyping);
 		});
+		client.on("presence", async (data) => {
+			log.verbose("Received presence change", data);
+			if (!data.users) {
+				data.users = [];
+			}
+			if (data.user) {
+				data.users.push(data.user);
+			}
+			for (const user of data.users) {
+				let matrixPresence = {
+					active: "online",
+					away: "offline",
+				}[data.presence];
+				if (!matrixPresence) {
+					matrixPresence = "offline";
+				}
+				await this.puppet.setUserPresence({
+					userId: user,
+					puppetId,
+				}, matrixPresence);
+			}
+		});
 		p.client = client;
 		try {
 			await client.connect();

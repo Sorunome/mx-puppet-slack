@@ -68,9 +68,17 @@ export class Client extends EventEmitter {
 				this.emit("authenticated", rtmStartData);
 			});
 
-			this.rtm.on("ready", () => {
+			this.rtm.on("ready", async () => {
 				this.emit("connected");
 				resolve();
+				const users = (await this.web.users.list()) as any;
+				if (users && users.members) {
+					const usersArr: string[] = [];
+					for (const u of users.members) {
+						usersArr.push(u.id);
+					}
+					await this.rtm.subscribePresence(usersArr);
+				}
 			});
 
 			this.rtm.on("message", (data) => {
@@ -89,7 +97,7 @@ export class Client extends EventEmitter {
 						this.data.channels.push(data.channel);
 						this.emit("addChannel", data.channel);
 					}
-				})
+				});
 			}
 
 			for (const ev of ["channel_rename", "group_rename"]) {
@@ -98,9 +106,10 @@ export class Client extends EventEmitter {
 				});
 			}
 
-			this.rtm.on("team_join", (data) => {
+			this.rtm.on("team_join", async (data) => {
 				this.data.users.push(data.user);
 				this.emit("addUser", data.user);
+				await this.rtm.subscribePresence([data.user.id]);
 			});
 
 			this.rtm.on("user_change", (data) => {
@@ -113,6 +122,11 @@ export class Client extends EventEmitter {
 				if (!this.typingUsers[key]) {
 					this.typingUsers[key] = data;
 				}
+			});
+
+			this.rtm.on("presence_change", (data) => {
+				log.silly(data);
+				this.emit("presence", data);
 			});
 
 			for (const ev of ["bot_added", "bot_changed"]) {
