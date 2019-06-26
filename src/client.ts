@@ -26,6 +26,7 @@ export class Client extends EventEmitter {
 	private web: WebClient;
 	private data: IClientData = {};
 	private lock: Lock<string>;
+	private typingUsers: {[key: string]: any};
 	constructor(
 		private token: string,
 	) {
@@ -35,6 +36,7 @@ export class Client extends EventEmitter {
 		this.data.channels = [];
 		this.data.users = [];
 		this.data.bots = [];
+		this.typingUsers = {};
 		this.lock = new Lock(FETCH_LOCK_TIMEOUT);
 	}
 
@@ -72,6 +74,11 @@ export class Client extends EventEmitter {
 			});
 
 			this.rtm.on("message", (data) => {
+				const key = (data.user || data.bot_id) + ";" + data.channel;
+				if (this.typingUsers[key]) {
+					this.emit("typing", this.typingUsers[key], true);
+					delete this.typingUsers[key];
+				}
 				this.emit("message", data);
 			});
 
@@ -101,7 +108,11 @@ export class Client extends EventEmitter {
 			});
 
 			this.rtm.on("user_typing", (data) => {
-				this.emit("typing", data);
+				this.emit("typing", data, true);
+				const key = (data.user || data.bot_id) + ";" + data.channel;
+				if (!this.typingUsers[key]) {
+					this.typingUsers[key] = data;
+				}
 			});
 
 			for (const ev of ["bot_added", "bot_changed"]) {

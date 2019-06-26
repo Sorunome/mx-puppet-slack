@@ -168,6 +168,10 @@ export class Slack {
 				await this.puppet.updateChannel(await this.getChannelParams(puppetId, chan));
 			});
 		}
+		client.on("typing", async (data, isTyping) => {
+			const params = this.getSendParams(puppetId, data);
+			await this.puppet.setUserTyping(params, isTyping);
+		});
 		p.client = client;
 		try {
 			await client.connect();
