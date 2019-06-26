@@ -30,7 +30,7 @@ export class Slack {
 		private puppet: PuppetBridge,
 	) { }
 
-	public getUserParams(user: any): IRemoteUserReceive {
+	public getUserParams(puppetId: number, user: any): IRemoteUserReceive {
 		// check if we have a user
 		if (user.profile) {
 			// get the rigth avatar url
@@ -41,6 +41,7 @@ export class Slack {
 			}
 			log.verbose(`Determined avatar url ${imageKey}`);
 			return {
+				puppetId,
 				userId: user.id,
 				avatarUrl,
 				name: user.profile.display_name,
@@ -54,6 +55,7 @@ export class Slack {
 		}
 		log.verbose(`Determined avatar url ${imageKey}`);
 		return {
+			puppetId,
 			userId: user.id,
 			avatarUrl,
 			name: user.name,
@@ -95,10 +97,11 @@ export class Slack {
 		return {
 			chan: {
 				roomId: data.channel,
-				puppetId: puppetId,
+				puppetId,
 			},
 			user: {
 				userId: data.user || data.bot_id,
+				puppetId
 			},
 		} as IReceiveParams;
 	}
@@ -156,7 +159,7 @@ export class Slack {
 		});
 		for (const ev of ["addUser", "updateUser", "updateBot"]) {
 			client.on(ev, async (user) => {
-				await this.puppet.updateUser(this.getUserParams(user));
+				await this.puppet.updateUser(this.getUserParams(puppetId, user));
 			});
 		}
 		for (const ev of ["addChannel", "updateChannel"]) {
@@ -293,7 +296,7 @@ export class Slack {
 		if (!user) {
 			return null;
 		}
-		return this.getUserParams(user);
+		return this.getUserParams(puppetId, user);
 	}
 
 	private getImageKeyFromObject(o: any): string | undefined {

@@ -7,7 +7,7 @@ const md = Markdown();
 md.use(MarkdownSlack);
 
 export interface ISlackMessageParserOpts {
-	puppetId?: number;
+	puppetId: number;
 	puppet: PuppetBridge;
 	client: Client;
 }
@@ -93,7 +93,10 @@ export class SlackMessageParser {
 			const u = result[1];
 			const user = await opts.client.getUserById(u);
 			if (user) {
-				const id = await opts.puppet.getMxidForUser(u, opts.puppetId);
+				const id = await opts.puppet.getMxidForUser({
+					userId: u,
+					puppetId: opts.puppetId,
+				});
 				const mentionmd = `<a href="https://matrix.to/#/${id}">${user.name}</a>`;
 				html = html.replace(result[0], mentionmd);
 			} else {
