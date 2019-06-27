@@ -6,7 +6,6 @@ import {
 	IMessageEvent,
 	IRemoteUser,
 	IRemoteChan,
-	ISendMessageOpts,
 	IFileEvent,
 	Util,
 } from "mx-puppet-bridge";
