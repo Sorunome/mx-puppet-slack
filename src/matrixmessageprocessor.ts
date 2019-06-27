@@ -1,11 +1,12 @@
 import * as Parser from "node-html-parser";
-import { Util } from "mx-puppet-bridge";
+import { Util, PuppetBridge } from "mx-puppet-bridge";
 
 const MATRIX_TO_LINK = "https://matrix.to/#/";
 
 export interface IMatrixMessageParserOpts {
 	listDepth?: number;
-	
+	puppetId: number;
+	puppet: PuppetBridge;
 }
 
 export class MatrixMessageProcessor {
@@ -59,12 +60,14 @@ export class MatrixMessageProcessor {
 	}
 
 	private static async parseUser(opts: IMatrixMessageParserOpts, id: string): Promise<string> {
-		const USER_REGEX = /^@_discord_([0-9]*)/;
-		const match = id.match(USER_REGEX);
-		if (!match) {
+		const parts = opts.puppet.userSync.getPartsFromMxid(id);
+		if (!parts) {
 			return "";
 		}
-		return `<@${match[1]}>`;
+		if (parts.puppetId !== opts.puppetId) {
+			return "";
+		}
+		return `<@${parts.userId}>`;
 	}
 
 	private static async parseChannel(opts: IMatrixMessageParserOpts, id: string): Promise<string> {

@@ -284,7 +284,10 @@ export class Slack {
 		if (!p) {
 			return;
 		}
-		const msg = await MatrixMessageProcessor.parse({}, data);
+		const msg = await MatrixMessageProcessor.parse({
+			puppetId: room.puppetId,
+			puppet: this.puppet,
+		} as IMatrixMessageParserOpts, data);
 		if (data.emote) {
 			await p.client.sendMessage(`_${msg}_`, room.roomId);
 		} else {
