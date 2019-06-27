@@ -4,8 +4,8 @@ import {
 	IReceiveParams,
 	IRemoteChanSend,
 	IMessageEvent,
-	IRemoteUserReceive,
-	IRemoteChanReceive,
+	IRemoteUser,
+	IRemoteChan,
 	ISendMessageOpts,
 	IFileEvent,
 	Util,
@@ -30,7 +30,7 @@ export class Slack {
 		private puppet: PuppetBridge,
 	) { }
 
-	public getUserParams(puppetId: number, user: any): IRemoteUserReceive {
+	public getUserParams(puppetId: number, user: any): IRemoteUser {
 		// check if we have a user
 		if (user.profile) {
 			// get the rigth avatar url
@@ -45,7 +45,7 @@ export class Slack {
 				userId: user.id,
 				avatarUrl,
 				name: user.profile.display_name,
-			} as IRemoteUserReceive;
+			} as IRemoteUser;
 		}
 		// okay, we have a bot
 		const imageKey = this.getImageKeyFromObject(user.icons);
@@ -59,16 +59,16 @@ export class Slack {
 			userId: user.id,
 			avatarUrl,
 			name: user.name,
-		} as IRemoteUserReceive;
+		} as IRemoteUser;
 	}
 
-	public async getChannelParams(puppetId: number, chan: any): IRemoteChanReceive {
+	public async getChannelParams(puppetId: number, chan: any): IRemoteChan {
 		if (chan.is_im) {
 			return {
 				puppetId,
 				roomId: chan.id,
 				isDirect: true,
-			} as IRemoteChanReceive;
+			} as IRemoteChan;
 		}
 		const p = this.puppets[puppetId];
 		let avatarUrl = "";
@@ -90,7 +90,7 @@ export class Slack {
 			avatarUrl,
 			topic: chan.topic ? chan.topic.value : "",
 			isDirect: false,
-		} as IRemoteChanReceive;
+		} as IRemoteChan;
 	}
 
 	public getSendParams(puppetId: number, data: any): IReceiveParams {
@@ -302,7 +302,7 @@ export class Slack {
 		await this.puppets[room.puppetId].client.sendFileMessage(data.url, data.filename, room.roomId);
 	}
 
-	public async createChan(puppetId: number, cid: string): Promise<IRemoteChanReceive | null> {
+	public async createChan(puppetId: number, cid: string): Promise<IRemoteChan | null> {
 		const p = this.puppets[puppetId];
 		if (!p) {
 			return null;
@@ -315,7 +315,7 @@ export class Slack {
 		return await this.getChannelParams(puppetId, chan);
 	}
 
-	public async createUser(puppetId: number, uid: string): Promise<IRemoteUserReceive | null> {
+	public async createUser(puppetId: number, uid: string): Promise<IRemoteUser | null> {
 		const p = this.puppets[puppetId];
 		if (!p) {
 			return null;
