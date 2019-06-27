@@ -98,7 +98,6 @@ export class Slack {
 			chan: {
 				roomId: data.channel,
 				puppetId,
-				isDirect: Boolean(chan.is_im),
 			},
 			user: {
 				userId: data.user || data.bot_id,
