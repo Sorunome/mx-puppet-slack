@@ -14,11 +14,15 @@ export interface ISlackMessageParserOpts {
 
 export class SlackMessageParser {
 	// largely from https://github.com/matrix-hacks/matrix-puppet-slack/blob/master/app.js "createAndSendPayload"
-	public static async parse(opts: ISlackMessageParserOpts, text: string, attachments?: any): Promise<{ msg: string; html: string; }> {
-		let messages = [text];
+	public static async parse(
+		opts: ISlackMessageParserOpts,
+		text: string,
+		attachments?: any,
+	): Promise<{ msg: string; html: string; }> {
+		const messages = [text];
 		if (attachments) {
-			attachments.forEach(att=> {
-				let attMessages = [] as string[];
+			attachments.forEach((att) => {
+				const attMessages = [] as string[];
 				if (att.pretext) {
 					messages.push(att.pretext);
 				}
@@ -40,32 +44,32 @@ export class SlackMessageParser {
 					attMessages.push(`${att.text}`);
 				}
 				if (att.fields) {
-					att.fields.forEach(field => {
+					att.fields.forEach((field) => {
 						if (field.title) {
 							attMessages.push(`*${field.title}*`);
 						}
 						if (field.value) {
 							attMessages.push(`${field.value}`);
 						}
-					})
+					});
 				}
 				if ((att.actions instanceof Array) && att.actions.length > 0) {
-					attMessages.push(`Actions (Unsupported): ${att.actions.map(o => `[${o.text}]`).join(" ")}`);
+					attMessages.push(`Actions (Unsupported): ${att.actions.map((o) => `[${o.text}]`).join(" ")}`);
 				}
 				if (att.footer) {
 					attMessages.push(`_${att.footer}_`);
 				}
-				let attachmentBullet = att.color ? `;BEGIN_FONT_COLOR_HACK_${att.color};●;END_FONT_COLOR_HACK;` : "●";
-				attMessages.forEach(attMessage => {
+				const attachmentBullet = att.color ? `;BEGIN_FONT_COLOR_HACK_${att.color};●;END_FONT_COLOR_HACK;` : "●";
+				attMessages.forEach((attMessage) => {
 					messages.push(`${attachmentBullet} ${attMessage}`);
 				});
 			});
 		}
 		// combind the messages
 		let rawMessage = messages
-			.filter(m => m && (typeof m === "string"))
-			.map(m => m.trim())
-			.join('\n')
+			.filter((m) => m && (typeof m === "string"))
+			.map((m) => m.trim())
+			.join("\n")
 			.trim();
 		// insert @room in place of <!channel> and <!here>
 		rawMessage = rawMessage.replace(/<!channel>/g, "@room");
@@ -73,14 +77,15 @@ export class SlackMessageParser {
 		let msg = rawMessage;
 		let html = md.render(msg);
 		// insert the colour hacks
-		html = html.replace(/;BEGIN_FONT_COLOR_HACK_(.*?);/g, '<font color="$1">');
-		html = html.replace(/;END_FONT_COLOR_HACK;/g, '</font>');
-		msg = msg.replace(/;BEGIN_FONT_COLOR_HACK_(.*?);/g, '');
-		msg = msg.replace(/;END_FONT_COLOR_HACK;/g, '');
+		html = html.replace(/;BEGIN_FONT_COLOR_HACK_(.*?);/g, "<font color=\"$1\">");
+		html = html.replace(/;END_FONT_COLOR_HACK;/g, "</font>");
+		msg = msg.replace(/;BEGIN_FONT_COLOR_HACK_(.*?);/g, "");
+		msg = msg.replace(/;END_FONT_COLOR_HACK;/g, "");
 
 		// replace user mentions
 		let result = null as RegExpExecArray | null;
-		while ((result = /<@([a-zA-Z0-9]*)>/g.exec(msg)) !== null) {
+		result = /<@([a-zA-Z0-9]*)>/g.exec(msg);
+		while (result !== null) {
 			const u = result[1];
 			const user = await opts.client.getUserById(u);
 			if (user) {
@@ -88,8 +93,10 @@ export class SlackMessageParser {
 			} else {
 				msg = msg.replace(result[0], u);
 			}
+			result = /<@([a-zA-Z0-9]*)>/g.exec(msg);
 		}
-		while ((result = /&lt;@([a-zA-Z0-9]*)&gt;/g.exec(html)) !== null) {
+		result = /&lt;@([a-zA-Z0-9]*)&gt;/g.exec(html);
+		while (result !== null) {
 			const u = result[1];
 			const user = await opts.client.getUserById(u);
 			if (user) {
@@ -102,6 +109,7 @@ export class SlackMessageParser {
 			} else {
 				html = html.replace(result[0], u);
 			}
+			result = /&lt;@([a-zA-Z0-9]*)&gt;/g.exec(html);
 		}
 		return { msg, html };
 	}

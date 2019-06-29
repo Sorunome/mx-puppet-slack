@@ -10,8 +10,10 @@ export interface IMatrixMessageParserOpts {
 }
 
 export class MatrixMessageProcessor {
-	private static listBulletPoints: string[] = ["●", "○", "■", "‣"];
-	public static async parse(opts: IMatrixMessageParserOpts, msg: any): Promise<string> {
+	public static async parse(
+		opts: IMatrixMessageParserOpts,
+		msg: any,
+	): Promise<string> {
 		let reply = "";
 		if (msg.formatted_body) {
 			// init opts
@@ -29,6 +31,8 @@ export class MatrixMessageProcessor {
 		}
 		return reply;
 	}
+
+	private static listBulletPoints: string[] = ["●", "○", "■", "‣"];
 
 	private static parsePreContent(opts: IMatrixMessageParserOpts, node: Parser.HTMLElement): string {
 		let text = node.text;
@@ -103,7 +107,10 @@ export class MatrixMessageProcessor {
 		return attrs.src ? `![${name}](${attrs.src})` : name;
 	}
 
-	private static async parseBlockquoteContent(opts: IMatrixMessageParserOpts, node: Parser.HTMLElement): Promise<string> {
+	private static async parseBlockquoteContent(
+		opts: IMatrixMessageParserOpts,
+		node: Parser.HTMLElement,
+	): Promise<string> {
 		let msg = await this.walkChildNodes(opts, node);
 
 		msg = msg.split("\n").map((s) => {
@@ -126,7 +133,6 @@ export class MatrixMessageProcessor {
 		return content;
 	}
 
-	
 	private static async parseUlContent(opts: IMatrixMessageParserOpts, node: Parser.HTMLElement): Promise<string> {
 		opts.listDepth!++;
 		const entries = await this.arrayChildNodes(opts, node, ["li"]);
@@ -143,7 +149,6 @@ export class MatrixMessageProcessor {
 		return msg;
 	}
 
-	
 	private static async parseOlContent(opts: IMatrixMessageParserOpts, node: Parser.HTMLElement): Promise<string> {
 		opts.listDepth!++;
 		const entries = await this.arrayChildNodes(opts, node, ["li"]);
@@ -165,7 +170,11 @@ export class MatrixMessageProcessor {
 		return msg;
 	}
 
-	private static async arrayChildNodes(opts: IMatrixMessageParserOpts, node: Parser.Node, types: string[] = []): Promise<string[]> {
+	private static async arrayChildNodes(
+		opts: IMatrixMessageParserOpts,
+		node: Parser.Node,
+		types: string[] = [],
+	): Promise<string[]> {
 		const replies: string[] = [];
 		await Util.AsyncForEach(node.childNodes, async (child) => {
 			if (types.length && (

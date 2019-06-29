@@ -15,12 +15,14 @@ import { MatrixMessageProcessor, IMatrixMessageParserOpts } from "./matrixmessag
 
 const log = new Log("SlackPuppet:slack");
 
+interface ISlackPuppet {
+	client: Client;
+	data: any;
+	clientStopped: boolean;
+}
+
 interface ISlackPuppets {
-	[puppetId: number]: {
-		client: Client;
-		data: any;
-		clientStopped: boolean;
-	}
+	[puppetId: number]: ISlackPuppet;
 }
 
 export class Slack {
@@ -45,20 +47,21 @@ export class Slack {
 				avatarUrl,
 				name: user.profile.display_name,
 			} as IRemoteUser;
+		} else {
+			// okay, we have a bot
+			const imageKey = this.getImageKeyFromObject(user.icons);
+			let avatarUrl = "";
+			if (imageKey) {
+				avatarUrl = user.icons[imageKey];
+			}
+			log.verbose(`Determined avatar url ${imageKey}`);
+			return {
+				puppetId,
+				userId: user.id,
+				avatarUrl,
+				name: user.name,
+			} as IRemoteUser;
 		}
-		// okay, we have a bot
-		const imageKey = this.getImageKeyFromObject(user.icons);
-		let avatarUrl = "";
-		if (imageKey) {
-			avatarUrl = user.icons[imageKey];
-		}
-		log.verbose(`Determined avatar url ${imageKey}`);
-		return {
-			puppetId,
-			userId: user.id,
-			avatarUrl,
-			name: user.name,
-		} as IRemoteUser;
 	}
 
 	public async getChannelParams(puppetId: number, chan: any): IRemoteChan {
@@ -100,7 +103,7 @@ export class Slack {
 			},
 			user: {
 				userId: data.user || data.bot_id,
-				puppetId
+				puppetId,
 			},
 		} as IReceiveParams;
 	}
@@ -145,13 +148,14 @@ export class Slack {
 				return;
 			}
 			log.info(`Lost connection for puppet ${puppetId}, reconnecting in a minute...`);
-			await Util.sleep(60 * 1000);
+			const MINUTE = 60000;
+			await Util.sleep(MINUTE);
 			try {
 				await this.startClient(puppetId);
 			} catch (err) {
 				log.warn("Failed to restart client", err);
 			}
-		})
+		});
 		client.on("message", async (data) => {
 			log.verbose("Got new message event");
 			await this.handleSlackMessage(puppetId, data);
@@ -212,7 +216,7 @@ export class Slack {
 			client,
 			data,
 			clientStopped: false,
-		} as any;//ISlackPuppets;
+		} as ISlackPuppet;
 		await this.startClient(puppetId);
 	}
 
@@ -307,7 +311,7 @@ export class Slack {
 			return null;
 		}
 		log.info(`Received create request for channel update puppetId=${puppetId} cid=${cid}`);
-		let chan = await p.client.getRoomById(cid);
+		const chan = await p.client.getRoomById(cid);
 		if (!chan) {
 			return null;
 		}

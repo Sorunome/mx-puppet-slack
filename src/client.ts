@@ -6,6 +6,7 @@ import { EventEmitter } from "events";
 
 const log = new Log("SlackPuppet:client");
 
+// tslint:disable-next-line:no-magic-numbers
 const FETCH_LOCK_TIMEOUT = 1000 * 60;
 
 interface ILock {
@@ -58,8 +59,8 @@ export class Client extends EventEmitter {
 			// the issue here is that at this point we dont know if
 			// its an "unrecoverable error" or not, so if we were to implement
 			// reconnect ourself in respones to this event, we may start looping
-			this.rtm.on('disconnected', () => {
-				this.emit('disconnected'); // can use this to announce status and issue a reconnect
+			this.rtm.on("disconnected", () => {
+				this.emit("disconnected"); // can use this to announce status and issue a reconnect
 			});
 
 			this.rtm.on("authenticated", (rtmStartData) => {
@@ -82,7 +83,7 @@ export class Client extends EventEmitter {
 			});
 
 			this.rtm.on("message", (data) => {
-				const key = (data.user || data.bot_id) + ";" + data.channel;
+				const key = `${data.user || data.bot_id};${data.channel}`;
 				if (this.typingUsers[key]) {
 					this.emit("typing", this.typingUsers[key], true);
 					delete this.typingUsers[key];
@@ -118,7 +119,7 @@ export class Client extends EventEmitter {
 
 			this.rtm.on("user_typing", (data) => {
 				this.emit("typing", data, true);
-				const key = (data.user || data.bot_id) + ";" + data.channel;
+				const key = `${data.user || data.bot_id};${data.channel}`;
 				if (!this.typingUsers[key]) {
 					this.typingUsers[key] = data;
 				}
@@ -135,6 +136,8 @@ export class Client extends EventEmitter {
 				});
 			}
 
+			// this is floating as we resolve the new promise in a callback
+			// tslint:disable-next-line:no-floating-promises
 			this.rtm.start();
 		});
 	}
@@ -144,7 +147,7 @@ export class Client extends EventEmitter {
 	}
 
 	public async getBotById(id: string): Promise<any> {
-		let bot = this.data.bots.find(u => (u.id === id || u.name === id));
+		const bot = this.data.bots.find((u) => (u.id === id || u.name === id));
 		if (bot) {
 			return bot;
 		}
@@ -157,14 +160,14 @@ export class Client extends EventEmitter {
 			this.lock.release(lockKey);
 			return ret.bot;
 		} catch (err) {
-			log.verbose('could not fetch the bot info', err.message);
+			log.verbose("could not fetch the bot info", err.message);
 		}
 		this.lock.release(lockKey);
 		return { name: "unknown" };
 	}
 
 	public async getUserById(id: string): Promise<any> {
-		let user = this.data.users.find(u => (u.id === id || u.name === id));
+		const user = this.data.users.find((u) => (u.id === id || u.name === id));
 		if (user) {
 			return user;
 		}
@@ -177,7 +180,7 @@ export class Client extends EventEmitter {
 			this.lock.release(lockKey);
 			return ret.user;
 		} catch (err) {
-			log.verbose('could not fetch the user info', err.message);
+			log.verbose("could not fetch the user info", err.message);
 		}
 		this.lock.release(lockKey);
 		return null;
@@ -192,7 +195,7 @@ export class Client extends EventEmitter {
 	}
 
 	public async getRoomById(id: string): Promise<any> {
-		let chan = this.data.channels.find(c => (c.id === id || c.name === id));
+		let chan = this.data.channels.find((c) => (c.id === id || c.name === id));
 		if (!chan) {
 			const lockKey = `chan_${id}`;
 			await this.lock.wait(lockKey);
@@ -207,7 +210,7 @@ export class Client extends EventEmitter {
 				this.lock.release(lockKey);
 				chan = ret.channel;
 			} catch (err) {
-				log.verbose('could not fetch the conversation info', err.message);
+				log.verbose("could not fetch the conversation info", err.message);
 				this.lock.release(lockKey);
 				return null;
 			}
@@ -220,10 +223,10 @@ export class Client extends EventEmitter {
 
 	public async getTeamById(id: string): Promise<any> {
 		try {
-			// as any, because web api doesn't know of team objects 
+			// as any, because web api doesn't know of team objects
 			return ((await this.web.team.info({ team: id })) as any).team;
 		} catch (err) {
-			log.verbose('could not fetch the team info', err.message);
+			log.verbose("could not fetch the team info", err.message);
 			return null;
 		}
 	}
@@ -231,7 +234,7 @@ export class Client extends EventEmitter {
 	public updateUser(user) {
 		let found = false;
 		for (let i = 0; i < this.data.users.length; i++) {
-			if (this.data.users[i].id == user.id) {
+			if (this.data.users[i].id === user.id) {
 				this.data.users[i] = user;
 				found = true;
 				break;
@@ -246,7 +249,7 @@ export class Client extends EventEmitter {
 	public updateBot(user) {
 		let found = false;
 		for (let i = 0; i < this.data.bots.length; i++) {
-			if (this.data.bots[i].id == user.id) {
+			if (this.data.bots[i].id === user.id) {
 				this.data.bots[i] = user;
 				found = true;
 				break;
@@ -260,9 +263,9 @@ export class Client extends EventEmitter {
 
 	public updateChannel(channel) {
 		let chan;
-		for (let i = 0; i < this.data.channels.length; i++) {
-			if (this.data.channels[i].id == channel.id) {
-				chan = this.data.channels[i];
+		for (const c of this.data.channels) {
+			if (c.id === channel.id) {
+				chan = c;
 				break;
 			}
 		}

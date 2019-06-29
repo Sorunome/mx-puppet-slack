@@ -5,6 +5,7 @@
   "main": "index.js",
   "scripts": {
     "build": "tsc",
+    "lint": "tslint --project ./tsconfig.json -t stylish",
     "start": "npm run-script build && node ./build/index.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
