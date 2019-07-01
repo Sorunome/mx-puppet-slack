@@ -2,7 +2,6 @@ import {
 	PuppetBridge,
 	Log,
 	IReceiveParams,
-	IRemoteChanSend,
 	IMessageEvent,
 	IRemoteUser,
 	IRemoteChan,
@@ -64,7 +63,7 @@ export class Slack {
 		}
 	}
 
-	public async getChannelParams(puppetId: number, chan: any): IRemoteChan {
+	public async getChannelParams(puppetId: number, chan: any): Promise<IRemoteChan> {
 		if (chan.is_im) {
 			return {
 				puppetId,
@@ -234,6 +233,7 @@ export class Slack {
 			puppet: this.puppet,
 			client,
 		} as ISlackMessageParserOpts;
+		log.verbose(`Received message. subtype=${data.subtype} files=${data.files ? data.files.length : 0}`);
 		if (data.subtype === "message_changed") {
 			if (data.message.text === data.previous_message.text) {
 				// nothing to do
@@ -268,7 +268,7 @@ export class Slack {
 				} catch (err) {
 					await this.puppet.sendMessage(params, {
 						body: `sent a file: ${f.url_private}`,
-						action: true,
+						emote: true,
 					});
 				}
 				if (f.initial_comment) {
@@ -282,7 +282,7 @@ export class Slack {
 		}
 	}
 
-	public async handleMatrixMessage(room: IRemoteChanSend, data: IMessageEvent, event: any) {
+	public async handleMatrixMessage(room: IRemoteChan, data: IMessageEvent, event: any) {
 		const p = this.puppets[room.puppetId];
 		if (!p) {
 			return;
@@ -298,7 +298,7 @@ export class Slack {
 		}
 	}
 
-	public async handleMatrixFile(room: IRemoteChanSend, data: IFileEvent, event: any) {
+	public async handleMatrixFile(room: IRemoteChan, data: IFileEvent, event: any) {
 		if (!this.puppets[room.puppetId]) {
 			return;
 		}

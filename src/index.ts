@@ -73,7 +73,7 @@ async function run() {
 	puppet.on("file", slack.handleMatrixFile.bind(slack));
 	puppet.setCreateChanHook(slack.createChan.bind(slack));
 	puppet.setCreateUserHook(slack.createUser.bind(slack));
-	puppet.setGetDescHook((puppetId: number, data: any, html: boolean): string => {
+	puppet.setGetDescHook(async (puppetId: number, data: any, html: boolean): Promise<string> => {
 		let s = "Slack";
 		if (data.team) {
 			const name = data.team.name;
@@ -93,7 +93,7 @@ async function run() {
 		}
 		return s;
 	});
-	puppet.setGetDastaFromStrHook((str: string): IRetData => {
+	puppet.setGetDastaFromStrHook(async (str: string): Promise<IRetData> => {
 		const retData = {
 			success: false,
 		} as IRetData;
