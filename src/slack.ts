@@ -242,7 +242,7 @@ export class Slack {
 			const { msg, html } = await SlackMessageParser.parse(parserOpts, `Edit: ${data.message.text}`);
 			await this.puppet.sendMessage(params, {
 				body: msg,
-				formatted_body: html,
+				formattedBody: html,
 			});
 			return;
 		}
@@ -251,7 +251,7 @@ export class Slack {
 			const { msg, html } = await SlackMessageParser.parse(parserOpts, data.text, data.attachments);
 			await this.puppet.sendMessage(params, {
 				body: msg,
-				formatted_body: html,
+				formattedBody: html,
 				emote: data.subtype === "me_message",
 			});
 		}
@@ -275,7 +275,7 @@ export class Slack {
 					const { msg, html } = await SlackMessageParser.parse(parserOpts, f.initial_comment);
 					await this.puppet.sendMessage(params, {
 						body: msg,
-						formatted_body: html,
+						formattedBody: html,
 					});
 				}
 			}
