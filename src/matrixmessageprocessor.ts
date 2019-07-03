@@ -12,22 +12,22 @@ export interface IMatrixMessageParserOpts {
 export class MatrixMessageProcessor {
 	public static async parse(
 		opts: IMatrixMessageParserOpts,
-		msg: any,
+		eventContent: any,
 	): Promise<string> {
 		let reply = "";
-		if (msg.formatted_body) {
+		if (eventContent.formatted_body) {
 			// init opts
 			opts.listDepth = 0;
 			// parser needs everything in html elements
 			// so we wrap everything in <div> just to be sure that all is wrapped
-			const parsed = Parser.parse(`<div>${msg.formatted_body}</div>`, {
+			const parsed = Parser.parse(`<div>${eventContent.formatted_body}</div>`, {
 				lowerCaseTagName: true,
 				pre: true,
 			} as any);
 			reply = await this.walkNode(opts, parsed);
 			reply = reply.replace(/\s*$/, ""); // trim off whitespace at end
 		} else {
-			reply = msg.body;
+			reply = eventContent.body;
 		}
 		return reply;
 	}
@@ -75,7 +75,14 @@ export class MatrixMessageProcessor {
 	}
 
 	private static async parseChannel(opts: IMatrixMessageParserOpts, id: string): Promise<string> {
-		return "";
+		const parts = opts.puppet.chanSync.getPartsFromMxid(id);
+		if (!parts) {
+			return "";
+		}
+		if (parts.puppetId !== opts.puppetId) {
+			return "";
+		}
+		return `<#${parts.roomId}|>`;
 	}
 
 	private static async parsePillContent(opts: IMatrixMessageParserOpts, node: Parser.HTMLElement): Promise<string> {

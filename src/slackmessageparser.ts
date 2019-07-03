@@ -2,6 +2,7 @@ import { PuppetBridge } from "mx-puppet-bridge";
 import { Client } from "./client";
 import * as Markdown from "markdown-it";
 import * as MarkdownSlack from "markdown-it-slack";
+import * as escapeHtml from "escape-html";
 
 const md = Markdown();
 md.use(MarkdownSlack);
@@ -104,12 +105,42 @@ export class SlackMessageParser {
 					userId: u,
 					puppetId: opts.puppetId,
 				});
-				const mentionmd = `<a href="https://matrix.to/#/${id}">${user.name}</a>`;
-				html = html.replace(result[0], mentionmd);
+				const pill = `<a href="https://matrix.to/#/${escapeHtml(id)}">${escapeHtml(user.name)}</a>`;
+				html = html.replace(result[0], pill);
 			} else {
-				html = html.replace(result[0], u);
+				html = html.replace(result[0], escapeHtml(u));
 			}
 			result = /&lt;@([a-zA-Z0-9]*)&gt;/g.exec(html);
+		}
+		// replace channel mention tags
+		result = /<#([a-zA-Z0-9]*)\|([^>]*)>/g.exec(msg);
+		while (result !== null) {
+			const id = result[1];
+			const chan = await opts.client.getChannelById(id);
+			if (chan) {
+				const name = "#" + chan.name;
+				msg = msg.replace(result[0], name);
+			} else {
+				msg = msg.replace(result[0], id);
+			}
+			result = /<#([a-zA-Z0-9]*)\|([^>]*)>/g.exec(msg);
+		}
+		result = /&lt;#([a-zA-Z0-9]*)\|([^&]*)&gt;/g.exec(html);
+		while (result !== null) {
+			const id = result[1];
+			const chan = await opts.client.getChannelById(id);
+			if (chan) {
+				const alias = await opts.puppet.getMxidForChan({
+					roomId: id,
+					puppetId: opts.puppetId,
+				});
+				const name = "#" + chan.name;
+				const pill = `<a href="https://matrix.to/#/${escapeHtml(alias)}">${escapeHtml(name)}</a>`;
+				html = html.replace(result[0], pill);
+			} else {
+				html = html.replace(result[0], escapeHtml(id));
+			}
+			result = /&lt;#([a-zA-Z0-9]*)\|([^&]*)&gt;/g.exec(html);
 		}
 		return { msg, html };
 	}
