@@ -96,14 +96,14 @@ export class Slack {
 
 	public getSendParams(puppetId: number, data: any): IReceiveParams {
 		let userId = data.user || data.bot_id;
-		let eventId = data.client_msg_id;
+		let eventId = data.ts;
 		for (const tryKey of ["message", "previous_message"]) {
 			if (data[tryKey]) {
 				if (!userId) {
 					userId = data[tryKey].user || data[tryKey].bot_id;
 				}
 				if (!eventId) {
-					eventId = data[tryKey].client_msg_id;
+					eventId = data[tryKey].ts;
 				}
 			}
 		}
@@ -249,21 +249,21 @@ export class Slack {
 		log.verbose(`Received message. subtype=${data.subtype} files=${data.files ? data.files.length : 0}`);
 		log.silly(data);
 		if (data.subtype === "message_changed") {
-			if (data.message.text === data.previous_message.text) {
+			if (data.message.text === data.previous_message.text || data.message.text.startsWith("\ufff0")) {
 				// nothing to do
 				return;
 			}
 			const { msg, html } = await SlackMessageParser.parse(parserOpts, data.message.text);
-			await this.puppet.sendEdit(params, data.previous_message.client_msg_id, {
+			await this.puppet.sendEdit(params, data.previous_message.ts, {
 				body: msg,
 				formattedBody: html,
 			});
 			return;
 		}
 		if (data.subtype === "message_deleted") {
-			await this.puppet.sendRedact(params, data.previous_message.client_msg_id);
+			await this.puppet.sendRedact(params, data.previous_message.ts);
 		}
-		if (data.text) {
+		if (data.text && !data.text.startsWith("\ufff0")) {
 			// send a normal message, if present
 			const { msg, html } = await SlackMessageParser.parse(parserOpts, data.text, data.attachments);
 			await this.puppet.sendMessage(params, {
@@ -308,18 +308,48 @@ export class Slack {
 			puppetId: room.puppetId,
 			puppet: this.puppet,
 		} as IMatrixMessageParserOpts, event.content);
+		let eventId = "";
 		if (data.emote) {
-			await p.client.sendMessage(`_${msg}_`, room.roomId);
+			eventId = await p.client.sendMeMessage(msg, room.roomId);
 		} else {
-			await p.client.sendMessage(msg, room.roomId);
+			eventId = await p.client.sendMessage(msg, room.roomId);
 		}
+		if (eventId) {
+			await this.puppet.eventStore.insert(room.puppetId, data.eventId!, eventId);
+		}
+	}
+
+	public async handleMatrixEdit(room: IRemoteChan, eventId: string, data: IMessageEvent, event: any) {
+		const p = this.puppets[room.puppetId];
+		if (!p) {
+			return;
+		}
+		const msg = await MatrixMessageProcessor.parse({
+			puppetId: room.puppetId,
+			puppet: this.puppet,
+		} as IMatrixMessageParserOpts, event.content["m.new_content"]);
+		const newEventId = await p.client.editMessage(msg, room.roomId, eventId);
+		if (newEventId) {
+			await this.puppet.eventStore.insert(room.puppetId, data.eventId!, newEventId);
+		}
+	}
+
+	public async handleMatrixRedact(room: IRemoteChan, eventId: string, event: any) {
+		const p = this.puppets[room.puppetId];
+		if (!p) {
+			return;
+		}
+		await p.client.deleteMessage(room.roomId, eventId);
 	}
 
 	public async handleMatrixFile(room: IRemoteChan, data: IFileEvent, event: any) {
 		if (!this.puppets[room.puppetId]) {
 			return;
 		}
-		await this.puppets[room.puppetId].client.sendFileMessage(data.url, data.filename, room.roomId);
+		const eventId = await this.puppets[room.puppetId].client.sendFileMessage(data.url, data.filename, room.roomId);
+		if (eventId) {
+			await this.puppet.eventStore.insert(room.puppetId, data.eventId!, eventId);
+		}
 	}
 
 	public async createChan(puppetId: number, cid: string): Promise<IRemoteChan | null> {

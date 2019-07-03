@@ -279,9 +279,35 @@ export class Client extends EventEmitter {
 		this.emit("updateChannel", channel);
 	}
 
-	public async sendMessage(text, channel) {
+	public async editMessage(text: string, channel: string, ts: string): Promise<string> {
+		const ret = await this.web.chat.update({
+			text: `\ufff0${text}`,
+			channel,
+			as_user: true,
+			ts,
+		});
+		return ret.ts as string;
+	}
+
+	public async deleteMessage(channel: string, ts: string) {
+		await this.web.chat.delete({
+			channel,
+			ts,
+			as_user: true,
+		});
+	}
+
+	public async sendMeMessage(text: string, channel: string): Promise<string> {
+		const ret = await this.web.chat.meMessage({
+			text: `\ufff0${text}`,
+			channel,
+		});
+		return ret.ts as string;
+	}
+
+	public async sendMessage(text: string, channel: string): Promise<string> {
 		const ret = await this.rtm.sendMessage(text, channel);
-		log.silly(ret);
+		return ret.ts as string;
 	}
 
 	public getUsers(): any {
@@ -292,7 +318,7 @@ export class Client extends EventEmitter {
 		return this.data.channels;
 	}
 
-	public async sendFileMessage(fileUrl: string, title: string, filename: string, channel?: string) {
+	public async sendFileMessage(fileUrl: string, title: string, filename: string, channel?: string): Promise<string> {
 		if (!channel) {
 			// three parameters, meaning title == filename
 			channel = filename;
@@ -307,7 +333,7 @@ export class Client extends EventEmitter {
 			channels: channel,
 		};
 		const ret = await this.web.files.upload(opts);
-		log.silly(ret);
+		return ret.ts as string;
 	}
 
 	public async downloadFile(url: string): Promise<Buffer> {
