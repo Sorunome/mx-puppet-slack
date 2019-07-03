@@ -280,7 +280,8 @@ export class Client extends EventEmitter {
 	}
 
 	public async sendMessage(text, channel) {
-		await this.rtm.sendMessage(text, channel);
+		const ret = await this.rtm.sendMessage(text, channel);
+		log.silly(ret);
 	}
 
 	public getUsers(): any {
@@ -305,7 +306,8 @@ export class Client extends EventEmitter {
 			filetype: "auto",
 			channels: channel,
 		};
-		await this.web.files.upload(opts);
+		const ret = await this.web.files.upload(opts);
+		log.silly(ret);
 	}
 
 	public async downloadFile(url: string): Promise<Buffer> {

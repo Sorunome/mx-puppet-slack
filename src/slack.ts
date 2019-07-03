@@ -95,13 +95,26 @@ export class Slack {
 	}
 
 	public getSendParams(puppetId: number, data: any): IReceiveParams {
+		let userId = data.user || data.bot_id;
+		let eventId = data.client_msg_id;
+		for (const tryKey of ["message", "previous_message"]) {
+			if (data[tryKey]) {
+				if (!userId) {
+					userId = data[tryKey].user || data[tryKey].bot_id;
+				}
+				if (!eventId) {
+					eventId = data[tryKey].client_msg_id;
+				}
+			}
+		}
 		return {
 			chan: {
 				roomId: data.channel,
 				puppetId,
 			},
+			eventId,
 			user: {
-				userId: data.user || data.bot_id,
+				userId,
 				puppetId,
 			},
 		} as IReceiveParams;
@@ -234,17 +247,21 @@ export class Slack {
 			client,
 		} as ISlackMessageParserOpts;
 		log.verbose(`Received message. subtype=${data.subtype} files=${data.files ? data.files.length : 0}`);
+		log.silly(data);
 		if (data.subtype === "message_changed") {
 			if (data.message.text === data.previous_message.text) {
 				// nothing to do
 				return;
 			}
-			const { msg, html } = await SlackMessageParser.parse(parserOpts, `Edit: ${data.message.text}`);
-			await this.puppet.sendMessage(params, {
+			const { msg, html } = await SlackMessageParser.parse(parserOpts, data.message.text);
+			await this.puppet.sendEdit(params, data.previous_message.client_msg_id, {
 				body: msg,
 				formattedBody: html,
 			});
 			return;
+		}
+		if (data.subtype === "message_deleted") {
+			await this.puppet.sendRedact(params, data.previous_message.client_msg_id);
 		}
 		if (data.text) {
 			// send a normal message, if present
