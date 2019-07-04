@@ -221,6 +221,23 @@ export class Client extends EventEmitter {
 		return chan;
 	}
 
+	public async getRoomForUser(id: string): Promise<string | null> {
+		const reply = await this.web.users.conversations({
+			types: "im",
+			user: id,
+		}) as any;
+		if (!reply.ok) {
+			return null;
+		}
+		if (!reply.channels.length) {
+			return null;
+		}
+		if (!reply.channels[0].is_im) {
+			return null;
+		}
+		return reply.channels[0].id;
+	}
+
 	public async getTeamById(id: string): Promise<any> {
 		try {
 			// as any, because web api doesn't know of team objects

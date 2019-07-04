@@ -352,33 +352,45 @@ export class Slack {
 		}
 	}
 
-	public async createChan(puppetId: number, cid: string): Promise<IRemoteChan | null> {
-		const p = this.puppets[puppetId];
+	public async createChan(oldChan: IRemoteChan): Promise<IRemoteChan | null> {
+		const p = this.puppets[oldChan.puppetId];
 		if (!p) {
 			return null;
 		}
-		log.info(`Received create request for channel update puppetId=${puppetId} cid=${cid}`);
-		const chan = await p.client.getRoomById(cid);
+		log.info(`Received create request for channel update puppetId=${oldChan.puppetId} roomId=${oldChan.roomId}`);
+		const chan = await p.client.getRoomById(oldChan.roomId);
 		if (!chan) {
 			return null;
 		}
-		return await this.getChannelParams(puppetId, chan);
+		return await this.getChannelParams(oldChan.puppetId, chan);
 	}
 
-	public async createUser(puppetId: number, uid: string): Promise<IRemoteUser | null> {
-		const p = this.puppets[puppetId];
+	public async createUser(oldUser: IRemoteUser): Promise<IRemoteUser | null> {
+		const p = this.puppets[oldUser.puppetId];
 		if (!p) {
 			return null;
 		}
-		log.info(`Received create request for user update puppetId=${puppetId} uid=${uid}`);
-		let user = await p.client.getUserById(uid);
+		log.info(`Received create request for user update puppetId=${oldUser.puppetId} userId=${oldUser.userId}`);
+		let user = await p.client.getUserById(oldUser.userId);
 		if (!user) {
-			user = await p.client.getBotById(uid);
+			user = await p.client.getBotById(oldUser.userId);
 		}
 		if (!user) {
 			return null;
 		}
-		return this.getUserParams(puppetId, user);
+		return this.getUserParams(oldUser.puppetId, user);
+	}
+
+	public async getDmRoom(user: IRemoteUser): Promise<string | null> {
+		const p = this.puppets[user.puppetId];
+		if (!p) {
+			return null;
+		}
+		const roomId = await p.client.getRoomForUser(user.userId);
+		if (!roomId) {
+			return null;
+		}
+		return roomId;
 	}
 
 	private getImageKeyFromObject(o: any): string | undefined {

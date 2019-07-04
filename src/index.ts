@@ -76,6 +76,7 @@ async function run() {
 	puppet.on("file", slack.handleMatrixFile.bind(slack));
 	puppet.setCreateChanHook(slack.createChan.bind(slack));
 	puppet.setCreateUserHook(slack.createUser.bind(slack));
+	puppet.setGetDmRoomIdHook(slack.getDmRoom.bind(slack));
 	puppet.setGetDescHook(async (puppetId: number, data: any, html: boolean): Promise<string> => {
 		let s = "Slack";
 		if (data.team) {
