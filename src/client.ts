@@ -238,6 +238,14 @@ export class Client extends EventEmitter {
 		return reply.channels[0].id;
 	}
 
+	public async listUsers(): Promise<any[]> {
+		const users = (await this.web.users.list()) as any;
+		if (!users || !users.members) {
+			return [];
+		}
+		return users.members;
+	}
+
 	public async getTeamById(id: string): Promise<any> {
 		try {
 			// as any, because web api doesn't know of team objects

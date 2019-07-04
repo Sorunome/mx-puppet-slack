@@ -7,6 +7,7 @@ import {
 	IRemoteChan,
 	IFileEvent,
 	Util,
+	IRetListUsers,
 } from "mx-puppet-bridge";
 import { SlackMessageParser, ISlackMessageParserOpts } from "./slackmessageparser";
 import { Client } from "./client";
@@ -391,6 +392,22 @@ export class Slack {
 			return null;
 		}
 		return roomId;
+	}
+
+	public async listUsers(puppetId: number): Promise<IRetListUsers[]> {
+		const p = this.puppets[puppetId];
+		if (!p) {
+			return [];
+		}
+		const reply: IRetListUsers[] = [];
+		const users = await p.client.listUsers();
+		for (const u of users) {
+			reply.push({
+				id: u.id,
+				name: u.profile ? u.profile.display_name : u.name,
+			});
+		}
+		return reply;
 	}
 
 	private getImageKeyFromObject(o: any): string | undefined {
