@@ -249,7 +249,7 @@ export class Client extends EventEmitter {
 	public async listChannels(): Promise<any[]> {
 		const reply = await this.web.users.conversations({
 			types: "public_channel,private_channel",
-			limit: 1000
+			limit: 1000,
 		}) as any;
 		if (!reply || !reply.ok) {
 			return [];
