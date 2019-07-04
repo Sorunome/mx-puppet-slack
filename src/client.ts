@@ -246,6 +246,17 @@ export class Client extends EventEmitter {
 		return users.members;
 	}
 
+	public async listChannels(): Promise<any[]> {
+		const reply = await this.web.users.conversations({
+			types: "public_channel,private_channel",
+			limit: 1000
+		}) as any;
+		if (!reply || !reply.ok) {
+			return [];
+		}
+		return reply.channels;
+	}
+
 	public async getTeamById(id: string): Promise<any> {
 		try {
 			// as any, because web api doesn't know of team objects

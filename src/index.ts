@@ -78,6 +78,7 @@ async function run() {
 	puppet.setCreateUserHook(slack.createUser.bind(slack));
 	puppet.setGetDmRoomIdHook(slack.getDmRoom.bind(slack));
 	puppet.setListUsersHook(slack.listUsers.bind(slack));
+	puppet.setListChansHook(slack.listChans.bind(slack));
 	puppet.setGetDescHook(async (puppetId: number, data: any, html: boolean): Promise<string> => {
 		let s = "Slack";
 		if (data.team) {

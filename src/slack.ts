@@ -7,7 +7,7 @@ import {
 	IRemoteChan,
 	IFileEvent,
 	Util,
-	IRetListUsers,
+	IRetList,
 } from "mx-puppet-bridge";
 import { SlackMessageParser, ISlackMessageParserOpts } from "./slackmessageparser";
 import { Client } from "./client";
@@ -394,17 +394,33 @@ export class Slack {
 		return roomId;
 	}
 
-	public async listUsers(puppetId: number): Promise<IRetListUsers[]> {
+	public async listUsers(puppetId: number): Promise<IRetList[]> {
 		const p = this.puppets[puppetId];
 		if (!p) {
 			return [];
 		}
-		const reply: IRetListUsers[] = [];
+		const reply: IRetList[] = [];
 		const users = await p.client.listUsers();
 		for (const u of users) {
 			reply.push({
 				id: u.id,
 				name: u.profile ? u.profile.display_name : u.name,
+			});
+		}
+		return reply;
+	}
+
+	public async listChans(puppetId: number): Promise<IRetList[]> {
+		const p = this.puppets[puppetId];
+		if (!p) {
+			return [];
+		}
+		const reply: IRetList[] = [];
+		const channels = await p.client.listChannels();
+		for (const c of channels) {
+			reply.push({
+				id: c.id,
+				name: c.name,
 			});
 		}
 		return reply;
