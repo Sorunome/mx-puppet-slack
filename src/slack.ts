@@ -108,6 +108,7 @@ export class Slack {
 				}
 			}
 		}
+		log.silly(`Generating send params roomId=${data.channel} userId=${userId} puppetId=${puppetId}`);
 		return {
 			chan: {
 				roomId: data.channel,
