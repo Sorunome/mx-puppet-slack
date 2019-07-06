@@ -12,6 +12,7 @@ import {
 import { SlackMessageParser, ISlackMessageParserOpts } from "./slackmessageparser";
 import { Client } from "./client";
 import { MatrixMessageProcessor, IMatrixMessageParserOpts } from "./matrixmessageprocessor";
+import * as Emoji from "node-emoji";
 
 const log = new Log("SlackPuppet:slack");
 
@@ -27,6 +28,8 @@ interface ISlackPuppets {
 
 export class Slack {
 	private puppets: ISlackPuppets = {};
+	private tsThreads: {[ts: string]: string} = {};
+	private threadSendTs: {[ts: string]: string} = {};
 	constructor(
 		private puppet: PuppetBridge,
 	) { }
@@ -108,11 +111,12 @@ export class Slack {
 				}
 			}
 		}
-		log.silly(`Generating send params roomId=${data.channel} userId=${userId} puppetId=${puppetId}`);
+		const roomId = data.channel || data.item.channel;
+		log.silly(`Generating send params roomId=${roomId} userId=${userId} puppetId=${puppetId}`);
 		log.silly(data);
 		return {
 			chan: {
-				roomId: data.channel,
+				roomId,
 				puppetId,
 			},
 			eventId,
@@ -212,6 +216,15 @@ export class Slack {
 				}, matrixPresence);
 			}
 		});
+		client.on("reaction_added", async (data) => {
+			log.verbose("Received new reaction", data);
+			const params = this.getSendParams(puppetId, data);
+			const e = Emoji.get(data.reaction);
+			if (!e) {
+				return;
+			}
+			await this.puppet.sendReaction(params, data.item.ts, e);
+		});
 		p.client = client;
 		try {
 			await client.connect();
@@ -241,7 +254,6 @@ export class Slack {
 		await this.removePuppet(puppetId);
 	}
 
-	public threadSendTs: {[ts: string]: string} = {};
 	public async handleSlackMessage(puppetId: number, data: any) {
 		const params = this.getSendParams(puppetId, data);
 		const client = this.puppets[puppetId].client;
@@ -267,7 +279,6 @@ export class Slack {
 			await this.puppet.sendRedact(params, data.previous_message.ts);
 			return;
 		}
-		let replyTo: string = "";
 		if (data.subtype === "message_replied" && !data.files) {
 			return;
 		}
@@ -278,7 +289,7 @@ export class Slack {
 				body: msg,
 				formattedBody: html,
 				emote: data.subtype === "me_message",
-			}
+			};
 			if (data.thread_ts) {
 				const replyTs = this.threadSendTs[data.thread_ts] || data.thread_ts;
 				this.threadSendTs[data.thread_ts] = data.ts;
@@ -349,7 +360,6 @@ export class Slack {
 		}
 	}
 
-	public tsThreads: {[ts: string]: string} = {};
 	public async handleMatrixReply(room: IRemoteChan, eventId: string, data: IMessageEvent, event: any) {
 		const p = this.puppets[room.puppetId];
 		if (!p) {
@@ -360,7 +370,7 @@ export class Slack {
 		while (this.tsThreads[tsThread]) {
 			tsThread = this.tsThreads[tsThread];
 		}
-		log.verbose(`Determined thread ts=${tsThread}`)
+		log.verbose(`Determined thread ts=${tsThread}`);
 		const msg = await MatrixMessageProcessor.parse({
 			puppetId: room.puppetId,
 			puppet: this.puppet,
@@ -378,6 +388,18 @@ export class Slack {
 			return;
 		}
 		await p.client.deleteMessage(room.roomId, eventId);
+	}
+
+	public async handleMatrixReaction(room: IRemoteChan, eventId: string, reaction: string) {
+		const p = this.puppets[room.puppetId];
+		if (!p) {
+			return;
+		}
+		const e = Emoji.find(reaction);
+		if (!e) {
+			return;
+		}
+		await p.client.sendReaction(room.roomId, eventId, e.key);
 	}
 
 	public async handleMatrixFile(room: IRemoteChan, data: IFileEvent, event: any) {

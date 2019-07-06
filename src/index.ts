@@ -75,6 +75,7 @@ async function run() {
 	puppet.on("edit", slack.handleMatrixEdit.bind(slack));
 	puppet.on("reply", slack.handleMatrixReply.bind(slack));
 	puppet.on("redact", slack.handleMatrixRedact.bind(slack));
+	puppet.on("reaction", slack.handleMatrixReaction.bind(slack));
 	puppet.on("file", slack.handleMatrixFile.bind(slack));
 	puppet.setCreateChanHook(slack.createChan.bind(slack));
 	puppet.setCreateUserHook(slack.createUser.bind(slack));

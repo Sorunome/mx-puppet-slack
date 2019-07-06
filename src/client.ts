@@ -91,6 +91,10 @@ export class Client extends EventEmitter {
 				this.emit("message", data);
 			});
 
+			this.rtm.on("reaction_added", (data) => {
+				this.emit("reaction_added", data);
+			});
+
 			for (const ev of ["channel_joined", "group_joined", "mpim_joined", "im_created"]) {
 				this.rtm.on(ev, async (data) => {
 					const chan = await this.getChannelById(data.channel.id);
@@ -354,6 +358,14 @@ export class Client extends EventEmitter {
 	public async sendMessage(text: string, channel: string): Promise<string> {
 		const ret = await this.rtm.sendMessage(text, channel);
 		return ret.ts as string;
+	}
+
+	public async sendReaction(channel: string, event: string, reaction: string) {
+		await this.web.reactions.add({
+			channel,
+			timestamp: event,
+			name: reaction,
+		});
 	}
 
 	public getUsers(): any {
