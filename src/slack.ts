@@ -241,6 +241,7 @@ export class Slack {
 		await this.removePuppet(puppetId);
 	}
 
+	public threadSendTs: {[ts: string]: string} = {};
 	public async handleSlackMessage(puppetId: number, data: any) {
 		const params = this.getSendParams(puppetId, data);
 		const client = this.puppets[puppetId].client;
@@ -250,7 +251,6 @@ export class Slack {
 			client,
 		} as ISlackMessageParserOpts;
 		log.verbose(`Received message. subtype=${data.subtype} files=${data.files ? data.files.length : 0}`);
-		log.silly(data);
 		if (data.subtype === "message_changed") {
 			if (data.message.text === data.previous_message.text || data.message.text.startsWith("\ufff0")) {
 				// nothing to do
@@ -265,15 +265,27 @@ export class Slack {
 		}
 		if (data.subtype === "message_deleted") {
 			await this.puppet.sendRedact(params, data.previous_message.ts);
+			return;
+		}
+		let replyTo: string = "";
+		if (data.subtype === "message_replied" && !data.files) {
+			return;
 		}
 		if (data.text && !data.text.startsWith("\ufff0")) {
 			// send a normal message, if present
 			const { msg, html } = await SlackMessageParser.parse(parserOpts, data.text, data.attachments);
-			await this.puppet.sendMessage(params, {
+			const opts = {
 				body: msg,
 				formattedBody: html,
 				emote: data.subtype === "me_message",
-			});
+			}
+			if (data.thread_ts) {
+				const replyTs = this.threadSendTs[data.thread_ts] || data.thread_ts;
+				this.threadSendTs[data.thread_ts] = data.ts;
+				await this.puppet.sendReply(params, replyTs, opts);
+			} else {
+				await this.puppet.sendMessage(params, opts);
+			}
 		}
 		if (data.files) {
 			// this has files
@@ -333,6 +345,29 @@ export class Slack {
 		} as IMatrixMessageParserOpts, event.content["m.new_content"]);
 		const newEventId = await p.client.editMessage(msg, room.roomId, eventId);
 		if (newEventId) {
+			await this.puppet.eventStore.insert(room.puppetId, data.eventId!, newEventId);
+		}
+	}
+
+	public tsThreads: {[ts: string]: string} = {};
+	public async handleMatrixReply(room: IRemoteChan, eventId: string, data: IMessageEvent, event: any) {
+		const p = this.puppets[room.puppetId];
+		if (!p) {
+			return;
+		}
+		log.verbose(`Got reply to send of ts=${eventId}`);
+		let tsThread = eventId;
+		while (this.tsThreads[tsThread]) {
+			tsThread = this.tsThreads[tsThread];
+		}
+		log.verbose(`Determined thread ts=${tsThread}`)
+		const msg = await MatrixMessageProcessor.parse({
+			puppetId: room.puppetId,
+			puppet: this.puppet,
+		} as IMatrixMessageParserOpts, event.content);
+		const newEventId = await p.client.replyMessage(msg, room.roomId, tsThread);
+		if (newEventId) {
+			this.tsThreads[newEventId] = tsThread;
 			await this.puppet.eventStore.insert(room.puppetId, data.eventId!, newEventId);
 		}
 	}

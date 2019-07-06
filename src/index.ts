@@ -45,6 +45,7 @@ const features = {
 	presence: true,
 	typingTimeout: 5500,
 	edit: true,
+	reply: true,
 } as IPuppetBridgeFeatures;
 
 const puppet = new PuppetBridge(options["registration-file"], options.config, features);
@@ -72,6 +73,7 @@ async function run() {
 	puppet.on("puppetDelete", slack.deletePuppet.bind(slack));
 	puppet.on("message", slack.handleMatrixMessage.bind(slack));
 	puppet.on("edit", slack.handleMatrixEdit.bind(slack));
+	puppet.on("reply", slack.handleMatrixReply.bind(slack));
 	puppet.on("redact", slack.handleMatrixRedact.bind(slack));
 	puppet.on("file", slack.handleMatrixFile.bind(slack));
 	puppet.setCreateChanHook(slack.createChan.bind(slack));

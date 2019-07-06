@@ -325,6 +325,16 @@ export class Client extends EventEmitter {
 		return ret.ts as string;
 	}
 
+	public async replyMessage(text: string, channel: string, ts: string): Promise<string> {
+		const ret = await this.web.chat.postMessage({
+			text: `\ufff0${text}`,
+			channel,
+			as_user: true,
+			thread_ts: ts,
+		});
+		return ret.ts as string;
+	}
+
 	public async deleteMessage(channel: string, ts: string) {
 		await this.web.chat.delete({
 			channel,
