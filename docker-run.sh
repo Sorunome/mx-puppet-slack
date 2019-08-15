@@ -4,7 +4,7 @@ if [ ! -f "/data/config.yaml" ]; then
 	exit 1
 fi
 if [ ! -f "/data/slack-registration.yaml" ]; then
-	node /opt/mx-puppet-slack/build/index.js -r
+	node /opt/mx-puppet-slack/build/index.js -c /data/config.yaml -f /data/slack-registration.yaml -r
 	echo "Registration generated."
 	exit 0
 fi
