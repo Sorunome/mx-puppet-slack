@@ -48,7 +48,7 @@ export class Slack {
 				puppetId,
 				userId: user.id,
 				avatarUrl,
-				name: user.profile.display_name,
+				name: user.profile.display_name || user.profile.real_name || user.real_name || user.name,
 			} as IRemoteUser;
 		} else {
 			// okay, we have a bot
