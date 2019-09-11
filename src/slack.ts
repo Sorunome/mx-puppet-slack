@@ -282,7 +282,7 @@ export class Slack {
 		if (data.subtype === "message_replied" && !data.files) {
 			return;
 		}
-		if (data.text && !data.text.startsWith("\ufff0")) {
+		if (data.text !== null && !data.text.startsWith("\ufff0")) {
 			// send a normal message, if present
 			const { msg, html } = await SlackMessageParser.parse(parserOpts, data.text, data.attachments);
 			const opts = {
