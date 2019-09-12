@@ -1,10 +1,13 @@
 import { PuppetBridge } from "mx-puppet-bridge";
 import { Client } from "./client";
-import * as Markdown from "markdown-it";
+import * as MarkdownIt from "markdown-it";
 import * as MarkdownSlack from "markdown-it-slack";
 import * as escapeHtml from "escape-html";
 
-const md = Markdown();
+const md = MarkdownIt({
+	breaks: true, // translate \n to <br>
+});
+
 md.use(MarkdownSlack);
 
 export interface ISlackMessageParserOpts {
