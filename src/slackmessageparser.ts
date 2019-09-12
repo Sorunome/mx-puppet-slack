@@ -75,76 +75,113 @@ export class SlackMessageParser {
 			.map((m) => m.trim())
 			.join("\n")
 			.trim();
+
 		// insert @room in place of <!channel> and <!here>
 		rawMessage = rawMessage.replace(/<!channel>/g, "@room");
 		rawMessage = rawMessage.replace(/<!here>/g, "@room");
+
+		// Replace &amp; with literal & - fixes &amp;amp;
+		rawMessage = rawMessage.replace(/&amp;/g, "&");
+
 		let msg = rawMessage;
-		let html = md.render(msg);
-		// insert the colour hacks
+		let result = null as RegExpExecArray | null;
+
+		// detect slack formatted urls (<scheme:uri|title>)
+		const URLRegexp = /<([a-zA-Z][a-zA-Z0-9+\-.]+:[^\|>]+)\|([^>]*)>/g;
+		do {
+			result = URLRegexp.exec(msg);
+			if (result) {
+				// convert slack url to markdown formatted url
+				// tslint:disable-next-line:no-magic-numbers
+				msg = msg.replace(result[0], `[${result[2]}](${result[1]})`);
+			}
+		} while (result);
+
+		let html = msg;
+
+		// replace user mentions
+		const userRegex = /<@([a-zA-Z0-9]*)>/g;
+		do {
+			result = userRegex.exec(msg);
+			if (result) {
+				const u = result[1];
+				const user = await opts.client.getUserById(u);
+				if (user) {
+					msg = msg.replace(result[0], user.name);
+				} else {
+					msg = msg.replace(result[0], u);
+				}
+			}
+		} while (result);
+
+		do {
+			result = userRegex.exec(msg);
+			if (result) {
+				const u = result[1];
+				const user = await opts.client.getUserById(u);
+				if (user) {
+					const id = await opts.puppet.getMxidForUser({
+						userId: u,
+						puppetId: opts.puppetId,
+					});
+					const pill = `[${escapeHtml(user.name)}](https://matrix.to/#/${escapeHtml(id)})`;
+					html = html.replace(result[0], pill);
+				} else {
+					html = html.replace(result[0], escapeHtml(u));
+				}
+			}
+		} while (result);
+
+		// replace channel mention tags
+		const channelRegex = /<#([a-zA-Z0-9]*)\|([^>]*)>/g;
+		do {
+			result = channelRegex.exec(msg);
+			if (result) {
+				const id = result[1];
+				const chan = await opts.client.getChannelById(id);
+				if (chan) {
+					const name = "#" + chan.name;
+					msg = msg.replace(result[0], name);
+				} else {
+					msg = msg.replace(result[0], id);
+				}
+			}
+		} while (result);
+
+		do {
+			result = channelRegex.exec(html);
+			if (result) {
+				const id = result[1];
+				const chan = await opts.client.getChannelById(id);
+				if (chan) {
+					const alias = await opts.puppet.getMxidForChan({
+						roomId: id,
+						puppetId: opts.puppetId,
+					});
+					const name = "#" + chan.name;
+					const pill = `[${escapeHtml(name)}](https://matrix.to/#/${escapeHtml(alias)})`;
+					html = html.replace(result[0], pill);
+				} else {
+					html = html.replace(result[0], escapeHtml(id));
+				}
+			}
+		} while (result);
+
+		// replace remaining slack literals
+		html = html.replace(/&gt;/g, ">");
+		html = html.replace(/&lt;/g, "<");
+		msg = msg.replace(/&gt;/g, ">");
+		msg = msg.replace(/&lt;/g, "<");
+
+		// render markdown as html
+		html = md.render(html);
+
+		// replace the colour hacks
 		html = html.replace(/;BEGIN_FONT_COLOR_HACK_(.*?);/g, "<font color=\"$1\">");
 		html = html.replace(/;END_FONT_COLOR_HACK;/g, "</font>");
 		msg = msg.replace(/;BEGIN_FONT_COLOR_HACK_(.*?);/g, "");
 		msg = msg.replace(/;END_FONT_COLOR_HACK;/g, "");
 
-		// replace user mentions
-		let result = null as RegExpExecArray | null;
-		result = /<@([a-zA-Z0-9]*)>/g.exec(msg);
-		while (result !== null) {
-			const u = result[1];
-			const user = await opts.client.getUserById(u);
-			if (user) {
-				msg = msg.replace(result[0], user.name);
-			} else {
-				msg = msg.replace(result[0], u);
-			}
-			result = /<@([a-zA-Z0-9]*)>/g.exec(msg);
-		}
-		result = /&lt;@([a-zA-Z0-9]*)&gt;/g.exec(html);
-		while (result !== null) {
-			const u = result[1];
-			const user = await opts.client.getUserById(u);
-			if (user) {
-				const id = await opts.puppet.getMxidForUser({
-					userId: u,
-					puppetId: opts.puppetId,
-				});
-				const pill = `<a href="https://matrix.to/#/${escapeHtml(id)}">${escapeHtml(user.name)}</a>`;
-				html = html.replace(result[0], pill);
-			} else {
-				html = html.replace(result[0], escapeHtml(u));
-			}
-			result = /&lt;@([a-zA-Z0-9]*)&gt;/g.exec(html);
-		}
-		// replace channel mention tags
-		result = /<#([a-zA-Z0-9]*)\|([^>]*)>/g.exec(msg);
-		while (result !== null) {
-			const id = result[1];
-			const chan = await opts.client.getChannelById(id);
-			if (chan) {
-				const name = "#" + chan.name;
-				msg = msg.replace(result[0], name);
-			} else {
-				msg = msg.replace(result[0], id);
-			}
-			result = /<#([a-zA-Z0-9]*)\|([^>]*)>/g.exec(msg);
-		}
-		result = /&lt;#([a-zA-Z0-9]*)\|([^&]*)&gt;/g.exec(html);
-		while (result !== null) {
-			const id = result[1];
-			const chan = await opts.client.getChannelById(id);
-			if (chan) {
-				const alias = await opts.puppet.getMxidForChan({
-					roomId: id,
-					puppetId: opts.puppetId,
-				});
-				const name = "#" + chan.name;
-				const pill = `<a href="https://matrix.to/#/${escapeHtml(alias)}">${escapeHtml(name)}</a>`;
-				html = html.replace(result[0], pill);
-			} else {
-				html = html.replace(result[0], escapeHtml(id));
-			}
-			result = /&lt;#([a-zA-Z0-9]*)\|([^&]*)&gt;/g.exec(html);
-		}
 		return { msg, html };
 	}
 }
