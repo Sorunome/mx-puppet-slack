@@ -118,7 +118,9 @@ export class Client extends EventEmitter {
 			});
 
 			this.rtm.on("user_change", (data) => {
-				this.updateUser(data.user);
+				if (data.user) {
+					this.updateUser(data.user);
+				}
 			});
 
 			this.rtm.on("user_typing", (data) => {
