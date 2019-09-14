@@ -147,6 +147,9 @@ export class Slack {
 			return;
 		}
 		const client = new Client(p.data.token);
+		client.on("connected", async () => {
+			await this.puppet.sendStatusMessage(puppetId, "connected");
+		});
 		client.on("authenticated", async (data) => {
 			const d = this.puppets[puppetId].data;
 			if (!d.team) {
@@ -167,6 +170,7 @@ export class Slack {
 				return;
 			}
 			log.info(`Lost connection for puppet ${puppetId}, reconnecting in a minute...`);
+			await this.puppet.sendStatusMessage(puppetId, "Lost connection, reconnecting in a minute...");
 			const MINUTE = 60000;
 			await Util.sleep(MINUTE);
 			try {
@@ -230,6 +234,7 @@ export class Slack {
 			await client.connect();
 		} catch (err) {
 			log.warn("Failed to connect client", err);
+			await this.puppet.sendStatusMessage(puppetId, `Failed to connect client: ${err}`);
 			throw err;
 		}
 	}

@@ -82,23 +82,13 @@ async function run() {
 	puppet.setGetDmRoomIdHook(slack.getDmRoom.bind(slack));
 	puppet.setListUsersHook(slack.listUsers.bind(slack));
 	puppet.setListChansHook(slack.listChans.bind(slack));
-	puppet.setGetDescHook(async (puppetId: number, data: any, html: boolean): Promise<string> => {
+	puppet.setGetDescHook(async (puppetId: number, data: any): Promise<string> => {
 		let s = "Slack";
 		if (data.team) {
-			const name = data.team.name;
-			if (html) {
-				s += ` on <code>${escapeHtml(name)}</code>`;
-			} else {
-				s += ` on "${name}"`;
-			}
+			s += ` on \`${data.team.name}\``;
 		}
 		if (data.self) {
-			const name = data.self.name;
-			if (html) {
-				s += ` as <code>${escapeHtml(name)}`;
-			} else {
-				s += ` as "${name}"`;
-			}
+			s += ` as \`${data.self.name}\``;
 		}
 		return s;
 	});

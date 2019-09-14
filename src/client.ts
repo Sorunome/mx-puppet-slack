@@ -46,7 +46,7 @@ export class Client extends EventEmitter {
 	}
 
 	public async connect(): Promise<void> {
-		return new Promise((resolve, reject) => {
+		return new Promise(async (resolve, reject) => {
 			// we couldn't start up successfully, reject this.
 			this.rtm.once("unable_to_rtm_start", (err) => {
 				this.emit("unable-to-start", err);
@@ -142,9 +142,11 @@ export class Client extends EventEmitter {
 				});
 			}
 
-			// this is floating as we resolve the new promise in a callback
-			// tslint:disable-next-line:no-floating-promises
-			this.rtm.start();
+			try {
+				await this.rtm.start();
+			} catch (err) {
+				reject(err);
+			}
 		});
 	}
 
