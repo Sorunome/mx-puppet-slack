@@ -115,7 +115,7 @@ export class SlackMessageParser {
 		} while (result);
 
 		do {
-			result = userRegex.exec(msg);
+			result = userRegex.exec(html);
 			if (result) {
 				const u = result[1];
 				const user = await opts.client.getUserById(u);
