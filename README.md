@@ -2,3 +2,23 @@
 
 # mx-puppet-slack
 This is a slack puppeting bridge for matrix. It is based on [mx-puppet-bridge](https://github.com/Sorunome/mx-puppet-bridge).
+
+## Docker
+
+Docker image can be found at https://hub.docker.com/r/sorunome/mx-puppet-slack
+
+For docker you probably want the following changes in `config.yaml`:
+
+```yaml
+bindAddress: '0.0.0.0'
+filename: '/data/database.db'
+file: '/data/bridge.log'
+```
+
+Also check the config for other values, like your homeserver domain.
+
+## Start using
+
+Get a legacy token from https://api.slack.com/custom-integrations/legacy-tokens and then chat with the bot user (`@_slackpuppet_bot:domain.tld` unless you changed the config):
+
+    link <token>
