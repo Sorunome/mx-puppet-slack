@@ -1,6 +1,7 @@
 import { Request, Response } from "express";
 import { WebClient } from "@slack/web-api";
 import { IRetData } from "mx-puppet-bridge";
+import * as escapeHtml from "escape-html";
 
 import {Config} from "./index";
 
@@ -33,10 +34,10 @@ export const oauthCallback = async (req: Request, res: Response) => {
 			code: req.query.code,
 		});
 		res.send(getHtmlResponse(
-			`Your Slack token for ${oauthData.team_name} is`,
-			`<code>${oauthData.access_token}</code>`));
+			`Your Slack token for ${escapeHtml(oauthData.team_name)} is`,
+			`<code>${escapeHtml(oauthData.access_token)}</code>`));
 	} catch (err) {
-		res.status(forbidden).send(getHtmlResponse("Failed to get OAuth token", err));
+		res.status(forbidden).send(getHtmlResponse("Failed to get OAuth token", escapeHtml(err)));
 	}
 };
 
