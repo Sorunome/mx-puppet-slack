@@ -3,12 +3,14 @@ import {
 	IPuppetBridgeFeatures,
 	IPuppetBridgeRegOpts,
 	Log,
-	IRetData,
 } from "mx-puppet-bridge";
 import * as commandLineArgs from "command-line-args";
 import * as commandLineUsage from "command-line-usage";
 import { Slack } from "./slack";
-import * as escapeHtml from "escape-html";
+import { SlackConfigWrap } from "./config";
+import * as fs from "fs";
+import * as yaml from "js-yaml";
+import { oauthCallback, getDataFromStrHook } from "./oauth";
 
 const log = new Log("SlackPuppet:index");
 
@@ -66,8 +68,20 @@ if (options.register) {
 	process.exit(0);
 }
 
+let config: SlackConfigWrap = new SlackConfigWrap();
+
+function readConfig() {
+	config = new SlackConfigWrap();
+	config.applyConfig(yaml.safeLoad(fs.readFileSync(options.config)));
+}
+
+export function Config(): SlackConfigWrap {
+	return config;
+}
+
 async function run() {
 	await puppet.init();
+	readConfig();
 	const slack = new Slack(puppet);
 	puppet.on("puppetNew", slack.newPuppet.bind(slack));
 	puppet.on("puppetDelete", slack.deletePuppet.bind(slack));
@@ -92,24 +106,12 @@ async function run() {
 		}
 		return s;
 	});
-	puppet.setGetDastaFromStrHook(async (str: string): Promise<IRetData> => {
-		const retData = {
-			success: false,
-		} as IRetData;
-		if (!str) {
-			retData.error = "Please specify a token to link!";
-			return retData;
-		}
-		retData.success = true;
-		retData.data = {
-			token: str.trim(),
-		};
-		return retData;
-	});
+	puppet.setGetDastaFromStrHook(getDataFromStrHook);
 	puppet.setBotHeaderMsgHook((): string => {
 		return "Slack Puppet Bridge";
 	});
 	await puppet.start();
+	puppet.AS.expressAppInstance.get(config.oauth.redirectPath, oauthCallback);
 }
 
 // tslint:disable-next-line:no-floating-promises

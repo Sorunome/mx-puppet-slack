@@ -9,6 +9,19 @@ bridge:
   # Reachable URL of the Matrix homeserver
   homeserverUrl: https://matrix.org
 
+# Slack OAuth settings. Create a slack app at https://api.slack.com/apps
+oauth:
+  enabled: false
+  # Slack app credentials.
+  # N.B. This must be quoted so YAML wouldn't parse it as a float.
+  clientId: "242181311531.253471660323"
+  clientSecret: b3561066aa9af814155a12d33d9a28be
+  # Path where to listen for OAuth redirect callbacks.
+  redirectPath: /slack/oauth
+  # Set up proxying from https://your.domain/redirect_path to http://bindAddress:port/redirect_path,
+  # then set this field and the Slack app redirect URI field to the former.
+  redirectUri: https://your.domain/slack/oauth
+
 presence:
   # Bridge Discord online/offline status
   enabled: true
