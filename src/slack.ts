@@ -101,6 +101,7 @@ export class Slack {
 	public getSendParams(puppetId: number, data: any): IReceiveParams {
 		let userId = data.user || data.bot_id;
 		let eventId = data.ts;
+		let externalUrl: string | undefined;
 		for (const tryKey of ["message", "previous_message"]) {
 			if (data[tryKey]) {
 				if (!userId) {
@@ -114,12 +115,17 @@ export class Slack {
 		const roomId = data.channel || data.item.channel;
 		log.silly(`Generating send params roomId=${roomId} userId=${userId} puppetId=${puppetId}`);
 		log.silly(data);
+		const p = this.puppets[puppetId];
+		if (p) {
+			externalUrl = `https://${p.data.team.domain}.slack.com/archives/${roomId}/p${eventId}`;
+		}
 		return {
 			chan: {
 				roomId,
 				puppetId,
 			},
 			eventId,
+			externalUrl,
 			user: {
 				userId,
 				puppetId,
