@@ -20,11 +20,11 @@
     "js-yaml": "^3.13.1",
     "markdown-it": "^8.4.2",
     "markdown-it-slack": "^1.2.0",
-    "mx-puppet-bridge": "0.0.15",
+    "mx-puppet-bridge": "0.0.18",
     "node-emoji": "^1.10.0",
     "node-html-parser": "^1.1.15",
     "tslint": "^5.17.0",
-    "typescript": "^3.5.2"
+    "typescript": "^3.7.4"
   },
   "devDependencies": {
     "@types/node": "^12.0.8"
