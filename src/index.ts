@@ -1,6 +1,6 @@
 import {
 	PuppetBridge,
-	IPuppetBridgeFeatures,
+	IProtocolInformation,
 	IPuppetBridgeRegOpts,
 	Log,
 } from "mx-puppet-bridge";
@@ -42,15 +42,25 @@ if (options.help) {
 	process.exit(0);
 }
 
-const features = {
-	file: true, // no need for the others as we auto-detect types anyways
-	presence: true,
-	typingTimeout: 5500,
-	edit: true,
-	reply: true,
-} as IPuppetBridgeFeatures;
+const protocol = {
+	features: {
+		file: true, // no need for the others as we auto-detect types anyways
+		presence: true,
+		typingTimeout: 5500,
+		edit: true,
+		reply: true,
+	},
+	id: "slack",
+	displayname: "Slack",
+	externalUrl: "https://slack.com",
+	namePatterns: {
+		user: ":name",
+		room: ":name[:team? - :team,]",
+		group: ":name",
+	},
+} as IProtocolInformation;
 
-const puppet = new PuppetBridge(options["registration-file"], options.config, features);
+const puppet = new PuppetBridge(options["registration-file"], options.config, protocol);
 
 if (options.register) {
 	// okay, all we have to do is generate a registration file

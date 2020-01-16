@@ -8,6 +8,7 @@ import {
 	IFileEvent,
 	Util,
 	IRetList,
+	IStringFormatterVars,
 } from "mx-puppet-bridge";
 import { SlackMessageParser, ISlackMessageParserOpts } from "./slackmessageparser";
 import { Client } from "./client";
@@ -34,7 +35,15 @@ export class Slack {
 		private puppet: PuppetBridge,
 	) { }
 
-	public getUserParams(puppetId: number, user: any): IRemoteUser {
+	public async getUserParams(puppetId: number, user: any): Promise<IRemoteUser> {
+		const nameVars = {} as IStringFormatterVars;
+		const p = this.puppets[puppetId];
+		if (p && p.data.team) {
+			const team = await p.client.getTeamById(p.data.team.id);
+			if (team) {
+				nameVars.team = team.name;
+			}
+		}
 		// check if we have a user
 		if (user.profile) {
 			// get the rigth avatar url
@@ -44,11 +53,12 @@ export class Slack {
 				avatarUrl = user.profile[imageKey];
 			}
 			log.verbose(`Determined avatar url ${imageKey}`);
+			nameVars.name = user.profile.display_name || user.profile.real_name || user.real_name || user.name
 			return {
 				puppetId,
 				userId: user.id,
 				avatarUrl,
-				name: user.profile.display_name || user.profile.real_name || user.real_name || user.name,
+				nameVars,
 			} as IRemoteUser;
 		} else {
 			// okay, we have a bot
@@ -58,11 +68,12 @@ export class Slack {
 				avatarUrl = user.icons[imageKey];
 			}
 			log.verbose(`Determined avatar url ${imageKey}`);
+			nameVars.name = user.name;
 			return {
 				puppetId,
 				userId: user.id,
 				avatarUrl,
-				name: user.name,
+				nameVars,
 			} as IRemoteUser;
 		}
 	}
@@ -77,7 +88,9 @@ export class Slack {
 		}
 		const p = this.puppets[puppetId];
 		let avatarUrl = "";
-		let name = chan.name;
+		const nameVars = {
+			name: chan.name,
+		} as IStringFormatterVars;
 		if (p && p.data.team) {
 			const team = await p.client.getTeamById(p.data.team.id);
 			if (team) {
@@ -85,13 +98,13 @@ export class Slack {
 				if (imageKey) {
 					avatarUrl = team.icon[imageKey];
 				}
-				name += ` - ${team.name}`;
+				nameVars.team = team.name;
 			}
 		}
 		return {
 			puppetId,
 			roomId: chan.id,
-			name,
+			nameVars,
 			avatarUrl,
 			topic: chan.topic ? chan.topic.value : "",
 			isDirect: false,
@@ -191,7 +204,7 @@ export class Slack {
 		});
 		for (const ev of ["addUser", "updateUser", "updateBot"]) {
 			client.on(ev, async (user) => {
-				await this.puppet.updateUser(this.getUserParams(puppetId, user));
+				await this.puppet.updateUser(await this.getUserParams(puppetId, user));
 			});
 		}
 		for (const ev of ["addChannel", "updateChannel"]) {
@@ -449,7 +462,7 @@ export class Slack {
 		if (!user) {
 			return null;
 		}
-		return this.getUserParams(oldUser.puppetId, user);
+		return await this.getUserParams(oldUser.puppetId, user);
 	}
 
 	public async getDmRoom(user: IRemoteUser): Promise<string | null> {
