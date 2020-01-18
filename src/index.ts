@@ -101,11 +101,11 @@ async function run() {
 	puppet.on("redact", slack.handleMatrixRedact.bind(slack));
 	puppet.on("reaction", slack.handleMatrixReaction.bind(slack));
 	puppet.on("file", slack.handleMatrixFile.bind(slack));
-	puppet.setCreateChanHook(slack.createChan.bind(slack));
 	puppet.setCreateUserHook(slack.createUser.bind(slack));
+	puppet.setCreateRoomHook(slack.createRoom.bind(slack));
 	puppet.setGetDmRoomIdHook(slack.getDmRoom.bind(slack));
 	puppet.setListUsersHook(slack.listUsers.bind(slack));
-	puppet.setListChansHook(slack.listChans.bind(slack));
+	puppet.setListRoomsHook(slack.listRooms.bind(slack));
 	puppet.setGetDescHook(async (puppetId: number, data: any): Promise<string> => {
 		let s = "Slack";
 		if (data.team) {

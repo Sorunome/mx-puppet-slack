@@ -75,7 +75,7 @@ export class MatrixMessageProcessor {
 	}
 
 	private static async parseChannel(opts: IMatrixMessageParserOpts, id: string): Promise<string> {
-		const parts = await opts.puppet.chanSync.getPartsFromMxid(id);
+		const parts = await opts.puppet.roomSync.getPartsFromMxid(id);
 		if (!parts) {
 			return "";
 		}

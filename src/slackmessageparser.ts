@@ -154,7 +154,7 @@ export class SlackMessageParser {
 				const id = result[1];
 				const chan = await opts.client.getChannelById(id);
 				if (chan) {
-					const alias = await opts.puppet.getMxidForChan({
+					const alias = await opts.puppet.getMxidForRoom({
 						roomId: id,
 						puppetId: opts.puppetId,
 					});

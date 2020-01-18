@@ -4,7 +4,7 @@ import {
 	IReceiveParams,
 	IMessageEvent,
 	IRemoteUser,
-	IRemoteChan,
+	IRemoteRoom,
 	IFileEvent,
 	Util,
 	IRetList,
@@ -78,13 +78,13 @@ export class Slack {
 		}
 	}
 
-	public async getChannelParams(puppetId: number, chan: any): Promise<IRemoteChan> {
+	public async getRoomParams(puppetId: number, chan: any): Promise<IRemoteRoom> {
 		if (chan.is_im) {
 			return {
 				puppetId,
 				roomId: chan.id,
 				isDirect: true,
-			} as IRemoteChan;
+			} as IRemoteRoom;
 		}
 		const p = this.puppets[puppetId];
 		let avatarUrl = "";
@@ -108,7 +108,7 @@ export class Slack {
 			avatarUrl,
 			topic: chan.topic ? chan.topic.value : "",
 			isDirect: false,
-		} as IRemoteChan;
+		} as IRemoteRoom;
 	}
 
 	public getSendParams(puppetId: number, data: any): IReceiveParams {
@@ -133,7 +133,7 @@ export class Slack {
 			externalUrl = `https://${p.data.team.domain}.slack.com/archives/${roomId}/p${eventId}`;
 		}
 		return {
-			chan: {
+			room: {
 				roomId,
 				puppetId,
 			},
@@ -210,7 +210,7 @@ export class Slack {
 		for (const ev of ["addChannel", "updateChannel"]) {
 			client.on(ev, async (chan) => {
 				log.verbose("Received slack event to update channel:", ev);
-				await this.puppet.updateChannel(await this.getChannelParams(puppetId, chan));
+				await this.puppet.updateRoom(await this.getRoomParams(puppetId, chan));
 			});
 		}
 		client.on("typing", async (data, isTyping) => {
@@ -349,7 +349,7 @@ export class Slack {
 		}
 	}
 
-	public async handleMatrixMessage(room: IRemoteChan, data: IMessageEvent, event: any) {
+	public async handleMatrixMessage(room: IRemoteRoom, data: IMessageEvent, event: any) {
 		const p = this.puppets[room.puppetId];
 		if (!p) {
 			return;
@@ -369,7 +369,7 @@ export class Slack {
 		}
 	}
 
-	public async handleMatrixEdit(room: IRemoteChan, eventId: string, data: IMessageEvent, event: any) {
+	public async handleMatrixEdit(room: IRemoteRoom, eventId: string, data: IMessageEvent, event: any) {
 		const p = this.puppets[room.puppetId];
 		if (!p) {
 			return;
@@ -384,7 +384,7 @@ export class Slack {
 		}
 	}
 
-	public async handleMatrixReply(room: IRemoteChan, eventId: string, data: IMessageEvent, event: any) {
+	public async handleMatrixReply(room: IRemoteRoom, eventId: string, data: IMessageEvent, event: any) {
 		const p = this.puppets[room.puppetId];
 		if (!p) {
 			return;
@@ -406,7 +406,7 @@ export class Slack {
 		}
 	}
 
-	public async handleMatrixRedact(room: IRemoteChan, eventId: string, event: any) {
+	public async handleMatrixRedact(room: IRemoteRoom, eventId: string, event: any) {
 		const p = this.puppets[room.puppetId];
 		if (!p) {
 			return;
@@ -414,7 +414,7 @@ export class Slack {
 		await p.client.deleteMessage(room.roomId, eventId);
 	}
 
-	public async handleMatrixReaction(room: IRemoteChan, eventId: string, reaction: string) {
+	public async handleMatrixReaction(room: IRemoteRoom, eventId: string, reaction: string) {
 		const p = this.puppets[room.puppetId];
 		if (!p) {
 			return;
@@ -426,7 +426,7 @@ export class Slack {
 		await p.client.sendReaction(room.roomId, eventId, e.key);
 	}
 
-	public async handleMatrixFile(room: IRemoteChan, data: IFileEvent, event: any) {
+	public async handleMatrixFile(room: IRemoteRoom, data: IFileEvent, event: any) {
 		if (!this.puppets[room.puppetId]) {
 			return;
 		}
@@ -436,7 +436,7 @@ export class Slack {
 		}
 	}
 
-	public async createChan(oldChan: IRemoteChan): Promise<IRemoteChan | null> {
+	public async createRoom(oldChan: IRemoteRoom): Promise<IRemoteRoom | null> {
 		const p = this.puppets[oldChan.puppetId];
 		if (!p) {
 			return null;
@@ -446,7 +446,7 @@ export class Slack {
 		if (!chan) {
 			return null;
 		}
-		return await this.getChannelParams(oldChan.puppetId, chan);
+		return await this.getRoomParams(oldChan.puppetId, chan);
 	}
 
 	public async createUser(oldUser: IRemoteUser): Promise<IRemoteUser | null> {
@@ -493,7 +493,7 @@ export class Slack {
 		return reply;
 	}
 
-	public async listChans(puppetId: number): Promise<IRetList[]> {
+	public async listRooms(puppetId: number): Promise<IRetList[]> {
 		const p = this.puppets[puppetId];
 		if (!p) {
 			return [];
