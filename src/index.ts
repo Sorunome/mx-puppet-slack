@@ -116,7 +116,7 @@ async function run() {
 		}
 		return s;
 	});
-	puppet.setGetDastaFromStrHook(getDataFromStrHook);
+	puppet.setGetDataFromStrHook(getDataFromStrHook);
 	puppet.setBotHeaderMsgHook((): string => {
 		return "Slack Puppet Bridge";
 	});

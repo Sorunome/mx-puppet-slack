@@ -20,7 +20,7 @@
     "js-yaml": "^3.13.1",
     "markdown-it": "^8.4.2",
     "markdown-it-slack": "^1.2.0",
-    "mx-puppet-bridge": "0.0.24-2",
+    "mx-puppet-bridge": "0.0.24-3",
     "node-emoji": "^1.10.0",
     "node-html-parser": "^1.1.15",
     "tslint": "^5.17.0",

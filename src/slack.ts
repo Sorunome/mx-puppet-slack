@@ -53,7 +53,7 @@ export class Slack {
 				avatarUrl = user.profile[imageKey];
 			}
 			log.verbose(`Determined avatar url ${imageKey}`);
-			nameVars.name = user.profile.display_name || user.profile.real_name || user.real_name || user.name
+			nameVars.name = user.profile.display_name || user.profile.real_name || user.real_name || user.name;
 			return {
 				puppetId,
 				userId: user.id,
