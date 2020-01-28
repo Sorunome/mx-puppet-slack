@@ -10,9 +10,10 @@ import {
 	IRetList,
 	IStringFormatterVars,
 } from "mx-puppet-bridge";
-import { SlackMessageParser, ISlackMessageParserOpts } from "./slackmessageparser";
+import {
+	SlackMessageParser, ISlackMessageParserOpts, MatrixMessageParser, IMatrixMessageParserOpts,
+} from "matrix-slack-parser";
 import { Client } from "./client";
-import { MatrixMessageProcessor, IMatrixMessageParserOpts } from "./matrixmessageprocessor";
 import * as Emoji from "node-emoji";
 
 const log = new Log("SlackPuppet:slack");
@@ -31,9 +32,14 @@ export class Slack {
 	private puppets: ISlackPuppets = {};
 	private tsThreads: {[ts: string]: string} = {};
 	private threadSendTs: {[ts: string]: string} = {};
+	private slackMessageParser: SlackMessageParser;
+	private matrixMessageParser: MatrixMessageParser;
 	constructor(
 		private puppet: PuppetBridge,
-	) { }
+	) {
+		this.slackMessageParser = new SlackMessageParser();
+		this.matrixMessageParser = new MatrixMessageParser();
+	}
 
 	public async getUserParams(puppetId: number, user: any): Promise<IRemoteUser> {
 		const nameVars = {} as IStringFormatterVars;
@@ -199,8 +205,12 @@ export class Slack {
 			}
 		});
 		client.on("message", async (data) => {
-			log.verbose("Got new message event");
-			await this.handleSlackMessage(puppetId, data);
+			try {
+				log.verbose("Got new message event");
+				await this.handleSlackMessage(puppetId, data);
+			} catch (err) {
+				log.error("Error handling slack message event", err);
+			}
 		});
 		for (const ev of ["addUser", "updateUser", "updateBot"]) {
 			client.on(ev, async (user) => {
@@ -282,9 +292,44 @@ export class Slack {
 		const params = this.getSendParams(puppetId, data);
 		const client = this.puppets[puppetId].client;
 		const parserOpts = {
-			puppetId,
-			puppet: this.puppet,
-			client,
+			callbacks: {
+				getUser: async (id: string, name: string) => {
+					const user = await client.getUserById(id);
+					if (!user) {
+						return null;
+					}
+					return {
+						mxid: await this.puppet.getMxidForUser({
+							puppetId,
+							userId: id,
+						}),
+						name: user.name,
+					};
+				},
+				getChannel: async (id: string, name: string) => {
+					const chan = await client.getChannelById(id);
+					if (!chan) {
+						return null;
+					}
+					return {
+						mxid: await this.puppet.getMxidForRoom({
+							puppetId,
+							roomId: id,
+						}),
+						name: "#" + chan.name,
+					};
+				},
+				getUsergroup: async (id: string, name: string) => null,
+				getTeam: async (id: string, name: string) => null,
+				urlToMxc: async (url: string) => {
+					try {
+						return await this.puppet.uploadContent(this.puppet.AS.botIntent.underlyingClient, url);
+					} catch (err) {
+						log.error("Error uploading file:", err.error || err.body || err);
+					}
+					return null;
+				},
+			},
 		} as ISlackMessageParserOpts;
 		log.verbose(`Received message. subtype=${data.subtype} files=${data.files ? data.files.length : 0}`);
 		if (data.subtype === "message_changed") {
@@ -292,10 +337,10 @@ export class Slack {
 				// nothing to do
 				return;
 			}
-			const { msg, html } = await SlackMessageParser.parse(parserOpts, data.message.text);
+			const res = await this.slackMessageParser.FormatMessage(parserOpts, data.message);
 			await this.puppet.sendEdit(params, data.previous_message.ts, {
-				body: msg,
-				formattedBody: html,
+				body: res.body,
+				formattedBody: res.formatted_body,
 			});
 			return;
 		}
@@ -308,10 +353,10 @@ export class Slack {
 		}
 		if (data.text !== null && !data.text.startsWith("\ufff0")) {
 			// send a normal message, if present
-			const { msg, html } = await SlackMessageParser.parse(parserOpts, data.text, data.attachments);
+			const res = await this.slackMessageParser.FormatMessage(parserOpts, data);
 			const opts = {
-				body: msg,
-				formattedBody: html,
+				body: res.body,
+				formattedBody: res.formatted_body,
 				emote: data.subtype === "me_message",
 			};
 			if (data.thread_ts) {
@@ -339,10 +384,10 @@ export class Slack {
 					});
 				}
 				if (f.initial_comment) {
-					const { msg, html } = await SlackMessageParser.parse(parserOpts, f.initial_comment);
+					const ret = await this.slackMessageParser.FormatText(parserOpts, f.initial_comment);
 					await this.puppet.sendMessage(params, {
-						body: msg,
-						formattedBody: html,
+						body: ret.body,
+						formattedBody: ret.formatted_body,
 					});
 				}
 			}
@@ -354,10 +399,10 @@ export class Slack {
 		if (!p) {
 			return;
 		}
-		const msg = await MatrixMessageProcessor.parse({
-			puppetId: room.puppetId,
-			puppet: this.puppet,
-		} as IMatrixMessageParserOpts, event.content);
+		const msg = await this.matrixMessageParser.FormatMessage(
+			this.getMatrixMessageParserOpts(room.puppetId),
+			event.content,
+		);
 		let eventId = "";
 		if (data.emote) {
 			eventId = await p.client.sendMeMessage(msg, room.roomId);
@@ -374,10 +419,10 @@ export class Slack {
 		if (!p) {
 			return;
 		}
-		const msg = await MatrixMessageProcessor.parse({
-			puppetId: room.puppetId,
-			puppet: this.puppet,
-		} as IMatrixMessageParserOpts, event.content["m.new_content"]);
+		const msg = await this.matrixMessageParser.FormatMessage(
+			this.getMatrixMessageParserOpts(room.puppetId),
+			event.content["m.new_content"],
+		);
 		const newEventId = await p.client.editMessage(msg, room.roomId, eventId);
 		if (newEventId) {
 			await this.puppet.eventStore.insert(room.puppetId, data.eventId!, newEventId);
@@ -395,10 +440,10 @@ export class Slack {
 			tsThread = this.tsThreads[tsThread];
 		}
 		log.verbose(`Determined thread ts=${tsThread}`);
-		const msg = await MatrixMessageProcessor.parse({
-			puppetId: room.puppetId,
-			puppet: this.puppet,
-		} as IMatrixMessageParserOpts, event.content);
+		const msg = await this.matrixMessageParser.FormatMessage(
+			this.getMatrixMessageParserOpts(room.puppetId),
+			event.content,
+		);
 		const newEventId = await p.client.replyMessage(msg, room.roomId, tsThread);
 		if (newEventId) {
 			this.tsThreads[newEventId] = tsThread;
@@ -507,6 +552,30 @@ export class Slack {
 			});
 		}
 		return reply;
+	}
+
+	private getMatrixMessageParserOpts(puppetId: number): IMatrixMessageParserOpts {
+		const client = this.puppets[puppetId].client;
+		return {
+			callbacks: {
+				canNotifyRoom: async () => true,
+				getUserId: async (mxid: string) => {
+					const parts = this.puppet.userSync.getPartsFromMxid(mxid);
+					if (!parts || parts.puppetId !== puppetId) {
+						return null;
+					}
+					return parts.userId;
+				},
+				getChannelId: async (mxid: string) => {
+					const parts = await this.puppet.roomSync.getPartsFromMxid(mxid);
+					if (!parts || parts.puppetId !== puppetId) {
+						return null;
+					}
+					return parts.roomId;
+				},
+				mxcUrlToHttp: (mxc: string) => this.puppet.getUrlFromMxc(mxc),
+			},
+		};
 	}
 
 	private getImageKeyFromObject(o: any): string | undefined {

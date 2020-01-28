@@ -323,9 +323,10 @@ export class Client extends EventEmitter {
 		this.emit("updateChannel", channel);
 	}
 
-	public async editMessage(text: string, channel: string, ts: string): Promise<string> {
+	public async editMessage(msg: any, channel: string, ts: string): Promise<string> {
+		msg.text = `\ufff0 ${msg.text}`;
 		const ret = await this.web.chat.update({
-			text: `\ufff0${text}`,
+			...msg,
 			channel,
 			as_user: true,
 			ts,
@@ -333,9 +334,10 @@ export class Client extends EventEmitter {
 		return ret.ts as string;
 	}
 
-	public async replyMessage(text: string, channel: string, ts: string): Promise<string> {
+	public async replyMessage(msg: any, channel: string, ts: string): Promise<string> {
+		msg.text = `\ufff0 ${msg.text}`;
 		const ret = await this.web.chat.postMessage({
-			text: `\ufff0${text}`,
+			...msg,
 			channel,
 			as_user: true,
 			thread_ts: ts,
@@ -351,16 +353,22 @@ export class Client extends EventEmitter {
 		});
 	}
 
-	public async sendMeMessage(text: string, channel: string): Promise<string> {
+	public async sendMeMessage(msg: any, channel: string): Promise<string> {
+		msg.text = `\ufff0 ${msg.text}`;
 		const ret = await this.web.chat.meMessage({
-			text: `\ufff0${text}`,
+			...msg,
 			channel,
 		});
 		return ret.ts as string;
 	}
 
-	public async sendMessage(text: string, channel: string): Promise<string> {
-		const ret = await this.rtm.sendMessage(text, channel);
+	public async sendMessage(msg: any, channel: string): Promise<string> {
+		msg.text = `\ufff0 ${msg.text}`;
+		const ret = await this.web.chat.postMessage({
+			...msg,
+			channel,
+			as_user: true,
+		});
 		return ret.ts as string;
 	}
 
