@@ -332,6 +332,9 @@ export class Slack {
 			},
 		} as ISlackMessageParserOpts;
 		log.verbose(`Received message. subtype=${data.subtype} files=${data.files ? data.files.length : 0}`);
+		if (data.subtype === "channel_join") {
+			return; // we don't handle those
+		}
 		if (data.subtype === "message_changed") {
 			if (data.message.text === data.previous_message.text || data.message.text.startsWith("\ufff0")) {
 				// nothing to do
