@@ -9,6 +9,7 @@ import {
 	Util,
 	IRetList,
 	IStringFormatterVars,
+	MessageDeduplicator,
 } from "mx-puppet-bridge";
 import {
 	SlackMessageParser, ISlackMessageParserOpts, MatrixMessageParser, IMatrixMessageParserOpts,
@@ -34,11 +35,13 @@ export class Slack {
 	private threadSendTs: {[ts: string]: string} = {};
 	private slackMessageParser: SlackMessageParser;
 	private matrixMessageParser: MatrixMessageParser;
+	private messageDeduplicator: MessageDeduplicator;
 	constructor(
 		private puppet: PuppetBridge,
 	) {
 		this.slackMessageParser = new SlackMessageParser();
 		this.matrixMessageParser = new MatrixMessageParser();
+		this.messageDeduplicator = new MessageDeduplicator();
 	}
 
 	public async getUserParams(puppetId: number, user: any): Promise<IRemoteUser> {
@@ -332,11 +335,13 @@ export class Slack {
 			},
 		} as ISlackMessageParserOpts;
 		log.verbose(`Received message. subtype=${data.subtype} files=${data.files ? data.files.length : 0}`);
+		const dedupeKey = `${puppetId};${params.room.roomId}`;
 		if (data.subtype === "channel_join") {
 			return; // we don't handle those
 		}
 		if (data.subtype === "message_changed") {
-			if (data.message.text === data.previous_message.text || data.message.text.startsWith("\ufff0")) {
+			if (data.message.text === data.previous_message.text ||
+				await this.messageDeduplicator.dedupe(dedupeKey, params.user.userId, params.eventId, data.message.text)) {
 				// nothing to do
 				return;
 			}
@@ -354,7 +359,9 @@ export class Slack {
 		if (data.subtype === "message_replied" && !data.files) {
 			return;
 		}
-		if (data.text !== null && !data.text.startsWith("\ufff0")) {
+		if (data.text && !(
+			await this.messageDeduplicator.dedupe(dedupeKey, params.user.userId, params.eventId, data.text)
+		)) {
 			// send a normal message, if present
 			const res = await this.slackMessageParser.FormatMessage(parserOpts, data);
 			const opts = {
@@ -373,7 +380,8 @@ export class Slack {
 		if (data.files) {
 			// this has files
 			for (const f of data.files) {
-				if (f.title && f.title.startsWith("\ufff0")) {
+				if (f.title &&
+					await this.messageDeduplicator.dedupe(dedupeKey, params.user.userId, params.eventId, "file:" + f.title)) {
 					// skip this, we sent it!
 					continue;
 				}
@@ -406,12 +414,15 @@ export class Slack {
 			this.getMatrixMessageParserOpts(room.puppetId),
 			event.content,
 		);
+		const dedupeKey = `${room.puppetId};${room.roomId}`;
+		this.messageDeduplicator.lock(dedupeKey, p.data.self.id, msg.text);
 		let eventId = "";
 		if (data.emote) {
 			eventId = await p.client.sendMeMessage(msg, room.roomId);
 		} else {
 			eventId = await p.client.sendMessage(msg, room.roomId);
 		}
+		this.messageDeduplicator.unlock(dedupeKey, p.data.self.id, eventId);
 		if (eventId) {
 			await this.puppet.eventStore.insert(room.puppetId, data.eventId!, eventId);
 		}
@@ -426,7 +437,10 @@ export class Slack {
 			this.getMatrixMessageParserOpts(room.puppetId),
 			event.content["m.new_content"],
 		);
+		const dedupeKey = `${room.puppetId};${room.roomId}`;
+		this.messageDeduplicator.lock(dedupeKey, p.data.self.id, msg.text);
 		const newEventId = await p.client.editMessage(msg, room.roomId, eventId);
+		this.messageDeduplicator.unlock(dedupeKey, p.data.self.id, newEventId);
 		if (newEventId) {
 			await this.puppet.eventStore.insert(room.puppetId, data.eventId!, newEventId);
 		}
@@ -447,7 +461,10 @@ export class Slack {
 			this.getMatrixMessageParserOpts(room.puppetId),
 			event.content,
 		);
+		const dedupeKey = `${room.puppetId};${room.roomId}`;
+		this.messageDeduplicator.lock(dedupeKey, p.data.self.id, msg.text);
 		const newEventId = await p.client.replyMessage(msg, room.roomId, tsThread);
+		this.messageDeduplicator.unlock(dedupeKey, p.data.self.id, newEventId);
 		if (newEventId) {
 			this.tsThreads[newEventId] = tsThread;
 			await this.puppet.eventStore.insert(room.puppetId, data.eventId!, newEventId);
@@ -475,10 +492,14 @@ export class Slack {
 	}
 
 	public async handleMatrixFile(room: IRemoteRoom, data: IFileEvent, event: any) {
-		if (!this.puppets[room.puppetId]) {
+		const p = this.puppets[room.puppetId];
+		if (!p) {
 			return;
 		}
+		const dedupeKey = `${room.puppetId};${room.roomId}`;
+		this.messageDeduplicator.lock(dedupeKey, p.data.self.id, "file:" + data.filename);
 		const eventId = await this.puppets[room.puppetId].client.sendFileMessage(data.url, data.filename, room.roomId);
+		this.messageDeduplicator.unlock(dedupeKey, p.data.self.id, eventId);
 		if (eventId) {
 			await this.puppet.eventStore.insert(room.puppetId, data.eventId!, eventId);
 		}

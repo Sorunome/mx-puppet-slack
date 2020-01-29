@@ -324,7 +324,6 @@ export class Client extends EventEmitter {
 	}
 
 	public async editMessage(msg: any, channel: string, ts: string): Promise<string> {
-		msg.text = `\ufff0 ${msg.text}`;
 		const ret = await this.web.chat.update({
 			...msg,
 			channel,
@@ -335,7 +334,6 @@ export class Client extends EventEmitter {
 	}
 
 	public async replyMessage(msg: any, channel: string, ts: string): Promise<string> {
-		msg.text = `\ufff0 ${msg.text}`;
 		const ret = await this.web.chat.postMessage({
 			...msg,
 			channel,
@@ -354,7 +352,6 @@ export class Client extends EventEmitter {
 	}
 
 	public async sendMeMessage(msg: any, channel: string): Promise<string> {
-		msg.text = `\ufff0 ${msg.text}`;
 		const ret = await this.web.chat.meMessage({
 			...msg,
 			channel,
@@ -363,7 +360,6 @@ export class Client extends EventEmitter {
 	}
 
 	public async sendMessage(msg: any, channel: string): Promise<string> {
-		msg.text = `\ufff0 ${msg.text}`;
 		const ret = await this.web.chat.postMessage({
 			...msg,
 			channel,
@@ -398,7 +394,7 @@ export class Client extends EventEmitter {
 		const opts = {
 			filename,
 			file: buffer,
-			title: `\ufff0${title}`,
+			title,
 			filetype: "auto",
 			channels: channel,
 		};
