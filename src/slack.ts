@@ -359,7 +359,7 @@ export class Slack {
 		if (data.subtype === "message_replied" && !data.files) {
 			return;
 		}
-		if (data.text && !(
+		if ((data.text || (data.attachments && data.attachments.length > 0) || (data.blocks && data.blocks.length > 0)) && !(
 			await this.messageDeduplicator.dedupe(dedupeKey, params.user.userId, params.eventId, data.text)
 		)) {
 			// send a normal message, if present
