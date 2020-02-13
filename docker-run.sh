@@ -1,7 +1,5 @@
 #!/bin/sh -e
 
-chown -R bridge:bridge /data
-
 if [ ! -f '/data/config.yaml' ]; then
 	echo 'No config found'
 	exit 1
