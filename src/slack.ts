@@ -16,6 +16,7 @@ import {
 } from "matrix-slack-parser";
 import { Client } from "./client";
 import * as Emoji from "node-emoji";
+import { SlackProvisioningAPI } from "./api";
 
 const log = new Log("SlackPuppet:slack");
 
@@ -36,12 +37,14 @@ export class Slack {
 	private slackMessageParser: SlackMessageParser;
 	private matrixMessageParser: MatrixMessageParser;
 	private messageDeduplicator: MessageDeduplicator;
+	private provisioningAPI: SlackProvisioningAPI;
 	constructor(
 		private puppet: PuppetBridge,
 	) {
 		this.slackMessageParser = new SlackMessageParser();
 		this.matrixMessageParser = new MatrixMessageParser();
 		this.messageDeduplicator = new MessageDeduplicator();
+		this.provisioningAPI = new SlackProvisioningAPI(puppet);
 	}
 
 	public async getUserParams(puppetId: number, user: any): Promise<IRemoteUser> {
