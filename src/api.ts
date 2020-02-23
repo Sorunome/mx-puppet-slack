@@ -1,9 +1,8 @@
-import { Request, Response } from "express";
-import { PuppetBridge } from "mx-puppet-bridge";
-import { WebClient } from "@slack/web-api";
-import { Config } from "./index";
+import { Response } from "express";
+import { PuppetBridge, IAuthedRequest } from "mx-puppet-bridge";
+import { convertOAuthToken } from "./oauth";
 
-const OK = 200;
+const CREATED = 201;
 const FORBIDDEN = 403;
 
 export class SlackProvisioningAPI {
@@ -11,24 +10,21 @@ export class SlackProvisioningAPI {
 		private puppet: PuppetBridge,
 	) {
 		const api = puppet.provisioningAPI;
-		api.v1.post("/oauth/access", this.convertOAuthToken);
+		api.v1.post("/oauth/link", this.linkOAuthCode);
 	}
 
-	private async convertOAuthToken(req: Request, res: Response) {
-		try {
-			const oauthData = await (new WebClient()).oauth.access({
-				client_id: Config().oauth.clientId,
-				client_secret: Config().oauth.clientSecret,
-				redirect_uri: Config().oauth.redirectUri,
-				// @ts-ignore
-				code: req.query.code,
-			});
-			res.status(OK).json(oauthData);
-		} catch (err) {
+	private async linkOAuthCode(req: IAuthedRequest, res: Response) {
+		const oauthData = await convertOAuthToken(req.body.code, req.body.redirect_uri);
+		if (!oauthData.ok) {
 			res.status(FORBIDDEN).json({
 				errcode: "M_UNKNOWN",
-				error: err,
+				error: oauthData.error,
 			});
+			return;
 		}
+		const puppetId = await this.puppet.provisioner.new(req.userId, {
+			token: oauthData.access_token as string,
+		});
+		res.status(CREATED).json({ puppet_id: puppetId });
 	}
 }
