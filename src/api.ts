@@ -10,7 +10,7 @@ export class SlackProvisioningAPI {
 		private puppet: PuppetBridge,
 	) {
 		const api = puppet.provisioningAPI;
-		api.v1.post("/oauth/link", this.linkOAuthCode);
+		api.v1.post("/oauth/link", this.linkOAuthCode.bind(this));
 	}
 
 	private async linkOAuthCode(req: IAuthedRequest, res: Response) {
