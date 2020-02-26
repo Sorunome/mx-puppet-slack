@@ -1,22 +1,38 @@
 #!/bin/sh -e
 
-chown -R bridge:bridge /data
-
-if [ ! -f '/data/config.yaml' ]; then
+if [ ! -f "$CONFIG_PATH" ]; then
 	echo 'No config found'
 	exit 1
 fi
 
-if [ ! -f '/data/slack-registration.yaml' ]; then
-    su -l bridge -c "/usr/local/bin/node '/opt/mx-puppet-slack/build/index.js' \
-            -c '/data/config.yaml' \
-            -f '/data/slack-registration.yaml' \
-            -r"
+args="$@"
 
-	echo 'Registration generated.'
-	exit 0
+if [ ! -f "$REGISTRATION_PATH" ]; then
+	echo 'No registration found, generating now'
+	args="-r"
 fi
 
-su -l bridge -c "/usr/local/bin/node '/opt/mx-puppet-slack/build/index.js' \
-    -c '/data/config.yaml' \
-    -f '/data/slack-registration.yaml'"
+
+# if no --uid is supplied, prepare files to drop privileges
+if [ "$(id -u)" = 0 ]; then
+	chown node:node /data
+
+	if find *.db > /dev/null 2>&1; then
+		# make sure sqlite files are writeable
+		chown node:node *.db
+	fi
+	if find *.log.* > /dev/null 2>&1; then
+		# make sure log files are writeable
+		chown node:node *.log.*
+	fi
+
+	su_exec='su-exec node:node'
+else
+	su_exec=''
+fi
+
+# $su_exec is used in case we have to drop the privileges
+exec $su_exec /usr/local/bin/node '/opt/mx-puppet-slack/build/index.js' \
+     -c "$CONFIG_PATH" \
+     -f "$REGISTRATION_PATH" \
+     $args
