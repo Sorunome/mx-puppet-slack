@@ -1,9 +1,9 @@
 import { Request, Response } from "express";
-import { WebClient } from "@slack/web-api";
+import { WebClient, WebAPICallResult } from "@slack/web-api";
 import { IRetData } from "mx-puppet-bridge";
 import * as escapeHtml from "escape-html";
 
-import {Config} from "./index";
+import { Config } from "./index";
 
 const forbidden = 403;
 const getHtmlResponse = (title, content) => `<!DOCTYPE html>
@@ -24,20 +24,23 @@ const getHtmlResponse = (title, content) => `<!DOCTYPE html>
 </html>
 `;
 
+export const convertOAuthToken = (code: string, redirectUri?: string): Promise<WebAPICallResult> => {
+	return (new WebClient()).oauth.access({
+		client_id: Config().oauth.clientId,
+		client_secret: Config().oauth.clientSecret,
+		redirect_uri: redirectUri || Config().oauth.redirectUri,
+		code,
+	});
+};
+
 export const oauthCallback = async (req: Request, res: Response) => {
-	try {
-		const oauthData = await (new WebClient()).oauth.access({
-			client_id: Config().oauth.clientId,
-			client_secret: Config().oauth.clientSecret,
-			redirect_uri: Config().oauth.redirectUri,
-			// @ts-ignore
-			code: req.query.code,
-		});
+	const oauthData = await convertOAuthToken(req.query.code);
+	if (oauthData.ok) {
 		res.send(getHtmlResponse(
 			`Your Slack token for ${escapeHtml(oauthData.team_name)} is`,
 			`<code>${escapeHtml(oauthData.access_token)}</code>`));
-	} catch (err) {
-		res.status(forbidden).send(getHtmlResponse("Failed to get OAuth token", escapeHtml(err)));
+	} else {
+		res.status(forbidden).send(getHtmlResponse("Failed to get OAuth token", oauthData.error));
 	}
 };
 
