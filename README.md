@@ -25,7 +25,8 @@ cd sample.config.yaml
 npm install
 cp sample.config.yaml config.yaml
 # fill info about your homeserver and Slack app credentials to config.yaml manually
-npm start
+npm run start -- -r # generate registration file
+npm run start
 ```
 
 ## How to get Slack app credentials
