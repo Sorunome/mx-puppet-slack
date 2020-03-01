@@ -31,6 +31,26 @@ npm run start
 
 ## How to get Slack app credentials
 
+### Legacy Token
 Get a legacy token from https://api.slack.com/custom-integrations/legacy-tokens and then chat with the bot user (`@_slackpuppet_bot:domain.tld` unless you changed the config):
+```
+link <token>
+```
 
-    link <token>
+### OAuth
+To use OAuth set up a slack app and fill in `oauth` block in your config. Be sure to forward the `oauth.redirectUri` to the bridge. Then just run:
+```
+link
+```
+
+### xoxc token
+**Warning**: Linking your `xoxc` account's token is against Slack's Terms of Service.
+
+First you must retrieve your `xoxc` token: In the network manager, filter for type WS/WebSocket, and the `xoxc` token is there as URL parameter of that request.
+
+Next you will need to get the contents of your `d` cookie.
+
+After that, run:
+```
+link <token> <d cookie contents>
+```

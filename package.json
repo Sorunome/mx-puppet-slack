@@ -19,10 +19,11 @@
     "events": "^3.0.0",
     "js-yaml": "^3.13.1",
     "matrix-slack-parser": "0.0.1",
-    "mx-puppet-bridge": "0.0.30",
+    "mx-puppet-bridge": "0.0.32",
     "node-emoji": "^1.10.0",
     "tslint": "^5.17.0",
-    "typescript": "^3.7.4"
+    "typescript": "^3.7.4",
+    "useragent-generator": "^1.1.1-amkt-22079-finish.0"
   },
   "devDependencies": {
     "@types/node": "^12.0.8"

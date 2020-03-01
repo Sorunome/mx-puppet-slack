@@ -3,6 +3,7 @@ import { Log, Util, Lock } from "mx-puppet-bridge";
 import { RTMClient } from "@slack/rtm-api";
 import { WebClient } from "@slack/web-api";
 import { EventEmitter } from "events";
+import * as ua from "useragent-generator";
 
 const log = new Log("SlackPuppet:client");
 
@@ -30,10 +31,22 @@ export class Client extends EventEmitter {
 	private typingUsers: {[key: string]: any};
 	constructor(
 		private token: string,
+		private cookie: string | null = null,
 	) {
 		super();
-		this.rtm = new RTMClient(this.token);
-		this.web = new WebClient(this.token);
+		// tslint:disable-next-line no-any
+		const useragent = ua.chrome("79.0.3945.117");
+		const webHeaders: any = this.cookie ? { headers: {
+			"Cookie": `d=${this.cookie}`,
+			"User-Agent": useragent,
+		}} : {};
+		// tslint:disable-next-line no-any
+		const rtmHeaders: any = this.cookie ? { tls: { headers: {
+			"Cookie": `d=${this.cookie}`,
+			"User-Agent": useragent,
+		}}} : {};
+		this.rtm = new RTMClient(this.token, rtmHeaders);
+		this.web = new WebClient(this.token, webHeaders);
 		this.data.channels = [];
 		this.data.users = [];
 		this.data.bots = [];

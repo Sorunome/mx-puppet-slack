@@ -24,7 +24,7 @@ const getHtmlResponse = (title, content) => `<!DOCTYPE html>
 </html>
 `;
 
-export const convertOAuthToken = (code: string, redirectUri?: string): Promise<WebAPICallResult> => {
+export const convertOAuthToken = async (code: string, redirectUri?: string): Promise<WebAPICallResult> => {
 	return (new WebClient()).oauth.access({
 		client_id: Config().oauth.clientId,
 		client_secret: Config().oauth.clientSecret,
@@ -57,9 +57,20 @@ export const getDataFromStrHook = async (str: string): Promise<IRetData> => {
 		}
 		return retData;
 	}
+	const parts = str.trim().split(" ");
+	const token = parts[0];
+	let cookie: string | null = null;
+	if (token.startsWith("xoxc")) {
+		if (!parts[1]) {
+			retData.error = "Please specify the `d` cookie for `xoxc` tokens!";
+			return retData;
+		}
+		cookie = parts[1];
+	}
 	retData.success = true;
 	retData.data = {
-		token: str.trim(),
+		token,
+		cookie,
 	};
 	return retData;
 };

@@ -10,6 +10,7 @@ import {
 	IRetList,
 	IStringFormatterVars,
 	MessageDeduplicator,
+	ISendingUser,
 } from "mx-puppet-bridge";
 import {
 	SlackMessageParser, ISlackMessageParserOpts, MatrixMessageParser, IMatrixMessageParserOpts,
@@ -177,7 +178,7 @@ export class Slack {
 		if (!p) {
 			return;
 		}
-		const client = new Client(p.data.token);
+		const client = new Client(p.data.token, p.data.cookie || null);
 		client.on("connected", async () => {
 			await this.puppet.sendStatusMessage(puppetId, "connected");
 		});
@@ -408,7 +409,7 @@ export class Slack {
 		}
 	}
 
-	public async handleMatrixMessage(room: IRemoteRoom, data: IMessageEvent, event: any) {
+	public async handleMatrixMessage(room: IRemoteRoom, data: IMessageEvent, asUser: ISendingUser | null, event: any) {
 		const p = this.puppets[room.puppetId];
 		if (!p) {
 			return;
@@ -431,7 +432,13 @@ export class Slack {
 		}
 	}
 
-	public async handleMatrixEdit(room: IRemoteRoom, eventId: string, data: IMessageEvent, event: any) {
+	public async handleMatrixEdit(
+		room: IRemoteRoom,
+		eventId: string,
+		data: IMessageEvent,
+		asUser: ISendingUser | null,
+		event: any,
+	) {
 		const p = this.puppets[room.puppetId];
 		if (!p) {
 			return;
@@ -449,7 +456,13 @@ export class Slack {
 		}
 	}
 
-	public async handleMatrixReply(room: IRemoteRoom, eventId: string, data: IMessageEvent, event: any) {
+	public async handleMatrixReply(
+		room: IRemoteRoom,
+		eventId: string,
+		data: IMessageEvent,
+		asUser: ISendingUser | null,
+		event: any,
+	) {
 		const p = this.puppets[room.puppetId];
 		if (!p) {
 			return;
@@ -474,7 +487,7 @@ export class Slack {
 		}
 	}
 
-	public async handleMatrixRedact(room: IRemoteRoom, eventId: string, event: any) {
+	public async handleMatrixRedact(room: IRemoteRoom, eventId: string, asUser: ISendingUser | null, event: any) {
 		const p = this.puppets[room.puppetId];
 		if (!p) {
 			return;
@@ -482,7 +495,7 @@ export class Slack {
 		await p.client.deleteMessage(room.roomId, eventId);
 	}
 
-	public async handleMatrixReaction(room: IRemoteRoom, eventId: string, reaction: string) {
+	public async handleMatrixReaction(room: IRemoteRoom, eventId: string, asUser: ISendingUser | null, reaction: string) {
 		const p = this.puppets[room.puppetId];
 		if (!p) {
 			return;
@@ -494,7 +507,12 @@ export class Slack {
 		await p.client.sendReaction(room.roomId, eventId, e.key);
 	}
 
-	public async handleMatrixFile(room: IRemoteRoom, data: IFileEvent, event: any) {
+	public async handleMatrixFile(
+		room: IRemoteRoom,
+		data: IFileEvent,
+		asUser: ISendingUser | null,
+		event: any,
+	) {
 		const p = this.puppets[room.puppetId];
 		if (!p) {
 			return;
