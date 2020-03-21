@@ -89,10 +89,15 @@ export function Config(): SlackConfigWrap {
 	return config;
 }
 
+export function Puppet(): PuppetBridge {
+	return puppet;
+}
+
 async function run() {
 	await puppet.init();
 	readConfig();
 	const slack = new Slack(puppet);
+	await slack.init();
 	puppet.on("puppetNew", slack.newPuppet.bind(slack));
 	puppet.on("puppetDelete", slack.deletePuppet.bind(slack));
 	puppet.on("message", slack.handleMatrixMessage.bind(slack));

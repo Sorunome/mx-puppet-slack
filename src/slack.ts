@@ -18,6 +18,7 @@ import {
 import { Client } from "./client";
 import * as Emoji from "node-emoji";
 import { SlackProvisioningAPI } from "./api";
+import { SlackStore } from "./store";
 
 const log = new Log("SlackPuppet:slack");
 
@@ -39,6 +40,7 @@ export class Slack {
 	private matrixMessageParser: MatrixMessageParser;
 	private messageDeduplicator: MessageDeduplicator;
 	private provisioningAPI: SlackProvisioningAPI;
+	private store: SlackStore;
 	constructor(
 		private puppet: PuppetBridge,
 	) {
@@ -46,9 +48,14 @@ export class Slack {
 		this.matrixMessageParser = new MatrixMessageParser();
 		this.messageDeduplicator = new MessageDeduplicator();
 		this.provisioningAPI = new SlackProvisioningAPI(puppet);
+		this.store = new SlackStore(puppet.store);
 	}
 
-	public async getUserParams(puppetId: number, user: any): Promise<IRemoteUser> {
+	public async init(): Promise<void> {
+		await this.store.init();
+	}
+
+	public async getUserParams(puppetId: number, user: any, teamId: string): Promise<IRemoteUser> {
 		const nameVars = {} as IStringFormatterVars;
 		const p = this.puppets[puppetId];
 		if (p && p.data.team) {
@@ -69,7 +76,7 @@ export class Slack {
 			nameVars.name = user.profile.display_name || user.profile.real_name || user.real_name || user.name;
 			return {
 				puppetId,
-				userId: user.id,
+				userId: `${teamId}-${user.id}`,
 				avatarUrl,
 				nameVars,
 			} as IRemoteUser;
@@ -84,18 +91,18 @@ export class Slack {
 			nameVars.name = user.name;
 			return {
 				puppetId,
-				userId: user.id,
+				userId: `${teamId}-${user.id}`,
 				avatarUrl,
 				nameVars,
 			} as IRemoteUser;
 		}
 	}
 
-	public async getRoomParams(puppetId: number, chan: any): Promise<IRemoteRoom> {
+	public async getRoomParams(puppetId: number, chan: any, teamId: string): Promise<IRemoteRoom> {
 		if (chan.is_im) {
 			return {
 				puppetId,
-				roomId: chan.id,
+				roomId: `${teamId}-${chan.id}`,
 				isDirect: true,
 			} as IRemoteRoom;
 		}
@@ -116,7 +123,7 @@ export class Slack {
 		}
 		return {
 			puppetId,
-			roomId: chan.id,
+			roomId: `${teamId}-${chan.id}`,
 			nameVars,
 			avatarUrl,
 			topic: chan.topic ? chan.topic.value : "",
@@ -145,15 +152,16 @@ export class Slack {
 		if (p) {
 			externalUrl = `https://${p.data.team.domain}.slack.com/archives/${roomId}/p${eventId}`;
 		}
+		const teamId = p.data.team.id;
 		return {
 			room: {
-				roomId,
+				roomId: `${teamId}-${roomId}`,
 				puppetId,
 			},
 			eventId,
 			externalUrl,
 			user: {
-				userId,
+				userId: `${teamId}-${userId}`,
 				puppetId,
 			},
 		} as IReceiveParams;
@@ -221,13 +229,13 @@ export class Slack {
 		});
 		for (const ev of ["addUser", "updateUser", "updateBot"]) {
 			client.on(ev, async (user) => {
-				await this.puppet.updateUser(await this.getUserParams(puppetId, user));
+				await this.puppet.updateUser(await this.getUserParams(puppetId, user, p.data.team.id));
 			});
 		}
 		for (const ev of ["addChannel", "updateChannel"]) {
 			client.on(ev, async (chan) => {
 				log.verbose("Received slack event to update channel:", ev);
-				await this.puppet.updateRoom(await this.getRoomParams(puppetId, chan));
+				await this.puppet.updateRoom(await this.getRoomParams(puppetId, chan, p.data.team.id));
 			});
 		}
 		client.on("typing", async (data, isTyping) => {
@@ -422,9 +430,9 @@ export class Slack {
 		this.messageDeduplicator.lock(dedupeKey, p.data.self.id, msg.text);
 		let eventId = "";
 		if (data.emote) {
-			eventId = await p.client.sendMeMessage(msg, room.roomId);
+			eventId = await p.client.sendMeMessage(msg, room.roomId.split("-")[1]);
 		} else {
-			eventId = await p.client.sendMessage(msg, room.roomId);
+			eventId = await p.client.sendMessage(msg, room.roomId.split("-")[1]);
 		}
 		this.messageDeduplicator.unlock(dedupeKey, p.data.self.id, eventId);
 		if (eventId) {
@@ -532,11 +540,12 @@ export class Slack {
 			return null;
 		}
 		log.info(`Received create request for channel update puppetId=${oldChan.puppetId} roomId=${oldChan.roomId}`);
-		const chan = await p.client.getRoomById(oldChan.roomId);
+		const [teamId, roomId] = oldChan.roomId.split("-");
+		const chan = await p.client.getRoomById(roomId);
 		if (!chan) {
 			return null;
 		}
-		return await this.getRoomParams(oldChan.puppetId, chan);
+		return await this.getRoomParams(oldChan.puppetId, chan, teamId);
 	}
 
 	public async createUser(oldUser: IRemoteUser): Promise<IRemoteUser | null> {
@@ -545,14 +554,15 @@ export class Slack {
 			return null;
 		}
 		log.info(`Received create request for user update puppetId=${oldUser.puppetId} userId=${oldUser.userId}`);
-		let user = await p.client.getUserById(oldUser.userId);
+		const [teamId, userId] = oldUser.userId.split("-");
+		let user = await p.client.getUserById(userId);
 		if (!user) {
-			user = await p.client.getBotById(oldUser.userId);
+			user = await p.client.getBotById(userId);
 		}
 		if (!user) {
 			return null;
 		}
-		return await this.getUserParams(oldUser.puppetId, user);
+		return await this.getUserParams(oldUser.puppetId, user, teamId);
 	}
 
 	public async getDmRoom(user: IRemoteUser): Promise<string | null> {
@@ -560,11 +570,12 @@ export class Slack {
 		if (!p) {
 			return null;
 		}
-		const roomId = await p.client.getRoomForUser(user.userId);
+		const [teamId, userId] = user.userId.split("-");
+		const roomId = await p.client.getRoomForUser(userId);
 		if (!roomId) {
 			return null;
 		}
-		return roomId;
+		return `${teamId}-${roomId}`;
 	}
 
 	public async listUsers(puppetId: number): Promise<IRetList[]> {
@@ -576,7 +587,7 @@ export class Slack {
 		const users = await p.client.listUsers();
 		for (const u of users) {
 			reply.push({
-				id: u.id,
+				id: `${p.data.team.id}-${u.id}`,
 				name: u.profile ? u.profile.display_name : u.name,
 			});
 		}
@@ -592,7 +603,7 @@ export class Slack {
 		const channels = await p.client.listChannels();
 		for (const c of channels) {
 			reply.push({
-				id: c.id,
+				id: `${p.data.team.id}-${c.id}`,
 				name: c.name,
 			});
 		}
@@ -609,14 +620,14 @@ export class Slack {
 					if (!parts || parts.puppetId !== puppetId) {
 						return null;
 					}
-					return parts.userId;
+					return parts.userId.split("-")[1] || null;
 				},
 				getChannelId: async (mxid: string) => {
 					const parts = await this.puppet.roomSync.getPartsFromMxid(mxid);
 					if (!parts || parts.puppetId !== puppetId) {
 						return null;
 					}
-					return parts.roomId;
+					return parts.roomId.split("-")[1] || null;
 				},
 				mxcUrlToHttp: (mxc: string) => this.puppet.getUrlFromMxc(mxc),
 			},
