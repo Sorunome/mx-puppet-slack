@@ -5,6 +5,7 @@ import {
 	IMessageEvent,
 	IRemoteUser,
 	IRemoteRoom,
+	IRemoteGroup,
 	IFileEvent,
 	Util,
 	IRetList,
@@ -19,6 +20,7 @@ import * as Slack from "soru-slack-client";
 import * as Emoji from "node-emoji";
 import { SlackProvisioningAPI } from "./api";
 import { SlackStore } from "./store";
+import * as escapeHtml from "escape-html";
 
 const log = new Log("SlackPuppet:slack");
 
@@ -98,6 +100,40 @@ export class App {
 			avatarUrl: chan.team.iconUrl,
 			topic: chan.topic,
 			isDirect: false,
+			groupId: chan.type === "mpim" ? undefined : chan.team.id,
+		};
+	}
+
+	public async getGroupParams(puppetId: number, team: Slack.Team): Promise<IRemoteGroup> {
+		if (team.partial) {
+			await team.load();
+		}
+		const roomIds: string[] = [];
+		let description = `<h1>${escapeHtml(team.name)}</h1>`;
+		description += `<h2>Channels:</h2><ul>`;
+		for (const [, chan] of team.channels) {
+			if (!["channel", "group"].includes(chan.type)) {
+				continue;
+			}
+			roomIds.push(chan.fullId);
+			const mxid = await this.puppet.getMxidForRoom({
+				puppetId,
+				roomId: chan.fullId,
+			});
+			const url = "https://matrix.to/#/" + mxid;
+			const name = escapeHtml(chan.name);
+			description += `<li>${name}: <a href="${url}">${name}</a></li>`;
+		}
+		description += "</ul>";
+		return {
+			puppetId,
+			groupId: team.id,
+			nameVars: {
+				name: team.name,
+			},
+			avatarUrl: team.iconUrl,
+			roomIds,
+			longDescription: description,
 		};
 	}
 
@@ -212,16 +248,24 @@ export class App {
 				log.error("Error handling slack messageDeleted event", err);
 			}
 		});
-		for (const ev of ["addUser", "changeUser"]) {
-			client.on(ev, async (user: Slack.User) => {
-				await this.puppet.updateUser(await this.getUserParams(puppetId, user));
-			});
-		}
-		for (const ev of ["addChannel", "changeChannel"]) {
-			client.on(ev, async (chan: Slack.Channel) => {
-				await this.puppet.updateRoom(await this.getRoomParams(puppetId, chan));
-			});
-		}
+		client.on("addUser", async (user: Slack.User) => {
+			await this.puppet.updateUser(await this.getUserParams(puppetId, user));
+		});
+		client.on("changeUser", async (_, user: Slack.User) => {
+			await this.puppet.updateUser(await this.getUserParams(puppetId, user));
+		});
+		client.on("addChannel", async (chan: Slack.Channel) => {
+			await this.puppet.updateRoom(await this.getRoomParams(puppetId, chan));
+		});
+		client.on("changeChannel", async (_, chan: Slack.Channel) => {
+			await this.puppet.updateRoom(await this.getRoomParams(puppetId, chan));
+		});
+		client.on("addTeam", async (team: Slack.Team) => {
+			await this.puppet.updateGroup(await this.getGroupParams(puppetId, team));
+		});
+		client.on("changeTeam", async (_, team: Slack.Team) => {
+			await this.puppet.updateGroup(await this.getGroupParams(puppetId, team));
+		});
 		client.on("typing", async (channel: Slack.Channel, user: Slack.User) => {
 			const params = await this.getSendParams(puppetId, channel, user);
 			await this.puppet.setUserTyping(params, true);
@@ -280,8 +324,6 @@ export class App {
 	}
 
 	public async handleSlackMessage(puppetId: number, msg: Slack.Message) {
-		console.log(msg);
-		console.log(msg.empty);
 		if (msg.empty && !msg.attachments && !msg.files) {
 			return; // nothing to do
 		}
@@ -290,7 +332,8 @@ export class App {
 		const parserOpts = this.getSlackMessageParserOpts(puppetId, msg.author.team);
 		log.verbose("Received message.");
 		const dedupeKey = `${puppetId};${params.room.roomId}`;
-		if (!(msg.empty || msg.attachments) && !await this.messageDeduplicator.dedupe(dedupeKey, params.user.userId, params.eventId, msg.text || "")) {
+		if (!(msg.empty || msg.attachments) &&
+			!await this.messageDeduplicator.dedupe(dedupeKey, params.user.userId, params.eventId, msg.text || "")) {
 			const res = await this.slackMessageParser.FormatMessage(parserOpts, {
 				text: msg.text || "",
 				blocks: msg.blocks || undefined,
@@ -541,6 +584,19 @@ export class App {
 		return await this.getUserParams(remoteUser.puppetId, user);
 	}
 
+	public async createGroup(remoteGroup: IRemoteGroup): Promise<IRemoteGroup | null> {
+		const p = this.puppets[remoteGroup.puppetId];
+		if (!p) {
+			return null;
+		}
+		log.info(`Received create request for group puppetId=${remoteGroup.puppetId} groupId=${remoteGroup.groupId}`);
+		const group = p.client.teams.get(remoteGroup.groupId);
+		if (!group) {
+			return null;
+		}
+		return await this.getGroupParams(remoteGroup.puppetId, group);
+	}
+
 	public async getDmRoom(remoteUser: IRemoteUser): Promise<string | null> {
 		const p = this.puppets[remoteUser.puppetId];
 		if (!p) {
@@ -602,6 +658,25 @@ export class App {
 			}
 		}
 		return reply;
+	}
+
+	public async getUserIdsInRoom(room: IRemoteRoom): Promise<Set<string> | null> {
+		const p = this.puppets[room.puppetId];
+		if (!p) {
+			return null;
+		}
+		const chan = p.client.getChannel(room.roomId);
+		if (!chan) {
+			return null;
+		}
+		const users = new Set<string>();
+		if (chan.partial) {
+			await chan.load();
+		}
+		for (const [, member] of chan.members) {
+			users.add(member.fullId);
+		}
+		return users;
 	}
 
 	private getMatrixMessageParserOpts(puppetId: number): IMatrixMessageParserOpts {

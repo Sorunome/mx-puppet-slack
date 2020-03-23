@@ -50,6 +50,7 @@ const protocol = {
 		typingTimeout: 5500,
 		edit: true,
 		reply: true,
+		globalNamespace: true,
 	},
 	id: "slack",
 	displayname: "Slack",
@@ -134,9 +135,11 @@ async function run() {
 	puppet.on("file", slack.handleMatrixFile.bind(slack));
 	puppet.setCreateUserHook(slack.createUser.bind(slack));
 	puppet.setCreateRoomHook(slack.createRoom.bind(slack));
+	puppet.setCreateGroupHook(slack.createGroup.bind(slack));
 	puppet.setGetDmRoomIdHook(slack.getDmRoom.bind(slack));
 	puppet.setListUsersHook(slack.listUsers.bind(slack));
 	puppet.setListRoomsHook(slack.listRooms.bind(slack));
+	puppet.setGetUserIdsInRoomHook(slack.getUserIdsInRoom.bind(slack));
 	puppet.setGetDescHook(async (puppetId: number, data: any): Promise<string> => {
 		let s = "Slack";
 		if (data.team) {
