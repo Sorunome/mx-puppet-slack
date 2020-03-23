@@ -15,7 +15,7 @@ import {
 import {
 	SlackMessageParser, ISlackMessageParserOpts, MatrixMessageParser, IMatrixMessageParserOpts,
 } from "matrix-slack-parser";
-import { Client } from "./client";
+import * as Slack from "soru-slack-client";
 import * as Emoji from "node-emoji";
 import { SlackProvisioningAPI } from "./api";
 import { SlackStore } from "./store";
@@ -23,7 +23,7 @@ import { SlackStore } from "./store";
 const log = new Log("SlackPuppet:slack");
 
 interface ISlackPuppet {
-	client: Client;
+	client: Slack.Client;
 	data: any;
 	clientStopped: boolean;
 }
@@ -32,7 +32,7 @@ interface ISlackPuppets {
 	[puppetId: number]: ISlackPuppet;
 }
 
-export class Slack {
+export class App {
 	private puppets: ISlackPuppets = {};
 	private tsThreads: {[ts: string]: string} = {};
 	private threadSendTs: {[ts: string]: string} = {};
@@ -55,116 +55,78 @@ export class Slack {
 		await this.store.init();
 	}
 
-	public async getUserParams(puppetId: number, user: any, teamId: string): Promise<IRemoteUser> {
-		const nameVars = {} as IStringFormatterVars;
-		const p = this.puppets[puppetId];
-		if (p && p.data.team) {
-			const team = await p.client.getTeamById(p.data.team.id);
-			if (team) {
-				nameVars.team = team.name;
-			}
+	public async getUserParams(puppetId: number, user: Slack.User | Slack.Bot): Promise<IRemoteUser> {
+		if (user.partial) {
+			await user.load();
 		}
-		// check if we have a user
-		if (user.profile) {
-			// get the rigth avatar url
-			const imageKey = this.getImageKeyFromObject(user.profile);
-			let avatarUrl = "";
-			if (imageKey) {
-				avatarUrl = user.profile[imageKey];
-			}
-			log.verbose(`Determined avatar url ${imageKey}`);
-			nameVars.name = user.profile.display_name || user.profile.real_name || user.real_name || user.name;
-			return {
-				puppetId,
-				userId: `${teamId}-${user.id}`,
-				avatarUrl,
-				nameVars,
-			} as IRemoteUser;
-		} else {
-			// okay, we have a bot
-			const imageKey = this.getImageKeyFromObject(user.icons);
-			let avatarUrl = "";
-			if (imageKey) {
-				avatarUrl = user.icons[imageKey];
-			}
-			log.verbose(`Determined avatar url ${imageKey}`);
-			nameVars.name = user.name;
-			return {
-				puppetId,
-				userId: `${teamId}-${user.id}`,
-				avatarUrl,
-				nameVars,
-			} as IRemoteUser;
-		}
-	}
-
-	public async getRoomParams(puppetId: number, chan: any, teamId: string): Promise<IRemoteRoom> {
-		if (chan.is_im) {
-			return {
-				puppetId,
-				roomId: `${teamId}-${chan.id}`,
-				isDirect: true,
-			} as IRemoteRoom;
-		}
-		const p = this.puppets[puppetId];
-		let avatarUrl = "";
-		const nameVars = {
-			name: chan.name,
-		} as IStringFormatterVars;
-		if (p && p.data.team) {
-			const team = await p.client.getTeamById(p.data.team.id);
-			if (team) {
-				const imageKey = this.getImageKeyFromObject(team.icon);
-				if (imageKey) {
-					avatarUrl = team.icon[imageKey];
-				}
-				nameVars.team = team.name;
-			}
+		const nameVars: IStringFormatterVars = {
+			team: user.team.name,
+			name: user.displayName,
+		};
+		let userId = user.fullId;
+		if (user instanceof Slack.Bot) {
+			userId += `-${user.displayName}`;
 		}
 		return {
 			puppetId,
-			roomId: `${teamId}-${chan.id}`,
+			userId,
+			avatarUrl: user.iconUrl,
 			nameVars,
-			avatarUrl,
-			topic: chan.topic ? chan.topic.value : "",
-			isDirect: false,
-		} as IRemoteRoom;
+		};
 	}
 
-	public getSendParams(puppetId: number, data: any): IReceiveParams {
-		let userId = data.user || data.bot_id;
-		let eventId = data.ts;
-		let externalUrl: string | undefined;
-		for (const tryKey of ["message", "previous_message"]) {
-			if (data[tryKey]) {
-				if (!userId) {
-					userId = data[tryKey].user || data[tryKey].bot_id;
-				}
-				if (!eventId) {
-					eventId = data[tryKey].ts;
-				}
-			}
-		}
-		const roomId = data.channel || data.item.channel;
-		log.silly(`Generating send params roomId=${roomId} userId=${userId} puppetId=${puppetId}`);
-		log.silly(data);
-		const p = this.puppets[puppetId];
-		if (p) {
-			externalUrl = `https://${p.data.team.domain}.slack.com/archives/${roomId}/p${eventId}`;
-		}
-		const teamId = p.data.team.id;
-		return {
-			room: {
-				roomId: `${teamId}-${roomId}`,
+	public async getRoomParams(puppetId: number, chan: Slack.Channel): Promise<IRemoteRoom> {
+		if (chan.type === "im") {
+			return {
 				puppetId,
-			},
+				roomId: chan.fullId,
+				isDirect: true,
+			};
+		}
+		if (chan.partial) {
+			await chan.load();
+		}
+		const nameVars: IStringFormatterVars = {
+			name: chan.name,
+			team: chan.team.name,
+			type: chan.type,
+		};
+		return {
+			puppetId,
+			roomId: chan.fullId,
+			nameVars,
+			avatarUrl: chan.team.iconUrl,
+			topic: chan.topic,
+			isDirect: false,
+		};
+	}
+
+	public async getSendParams(
+		puppetId: number,
+		msgOrChannel: Slack.Message | Slack.Channel,
+		user?: Slack.User | Slack.Bot,
+	): Promise<IReceiveParams> {
+		let externalUrl: string | undefined;
+		let eventId: string | undefined;
+		let channel: Slack.Channel;
+		if (!user) {
+			user = (msgOrChannel as Slack.Message).author;
+			const msg = msgOrChannel as Slack.Message;
+			channel = (msgOrChannel as Slack.Message).channel;
+			externalUrl = `https://${user.team.domain}.slack.com/archives/${channel.id}/p${msg.ts}`;
+			eventId = msg.ts;
+		} else {
+			channel = msgOrChannel as Slack.Channel;
+		}
+		if (user.team.partial) {
+			await user.team.load();
+		}
+		return {
+			room: await this.getRoomParams(puppetId, channel),
+			user: await this.getUserParams(puppetId, user),
 			eventId,
 			externalUrl,
-			user: {
-				userId: `${teamId}-${userId}`,
-				puppetId,
-			},
-		} as IReceiveParams;
+		};
 	}
 
 	public async removePuppet(puppetId: number) {
@@ -186,24 +148,30 @@ export class Slack {
 		if (!p) {
 			return;
 		}
-		const client = new Client(p.data.token, p.data.cookie || null);
+		const opts: Slack.IClientOpts = {};
+		if (p.data.token) {
+			opts.token = p.data.token;
+		}
+		if (p.data.cookie) {
+			opts.cookie = p.data.cookie;
+		}
+		const client = new Slack.Client(opts);
 		client.on("connected", async () => {
 			await this.puppet.sendStatusMessage(puppetId, "connected");
-		});
-		client.on("authenticated", async (data) => {
-			const d = this.puppets[puppetId].data;
-			if (!d.team) {
-				d.team = data.team;
-			} else {
-				Object.assign(d.team, data.team);
+			for (const [, user] of client.users) {
+				const d = this.puppets[puppetId].data;
+				d.team = {
+					id: user.team.id,
+					name: user.team.name,
+				};
+				d.self = {
+					id: user.fullId,
+					name: user.name,
+				};
+				await this.puppet.setUserId(puppetId, user.fullId);
+				await this.puppet.setPuppetData(puppetId, d);
+				break;
 			}
-			if (!d.self) {
-				d.self = data.self;
-			} else {
-				Object.assign(d.self, data.self);
-			}
-			await this.puppet.setUserId(puppetId, data.self.id);
-			await this.puppet.setPuppetData(puppetId, d);
 		});
 		client.on("disconnected", async () => {
 			if (p.clientStopped) {
@@ -217,61 +185,69 @@ export class Slack {
 				await this.startClient(puppetId);
 			} catch (err) {
 				log.warn("Failed to restart client", err);
+				await this.puppet.sendStatusMessage(puppetId, "Failed to restart client");
 			}
 		});
-		client.on("message", async (data) => {
+		client.on("message", async (msg: Slack.Message) => {
 			try {
 				log.verbose("Got new message event");
-				await this.handleSlackMessage(puppetId, data);
+				await this.handleSlackMessage(puppetId, msg);
 			} catch (err) {
 				log.error("Error handling slack message event", err);
 			}
 		});
-		for (const ev of ["addUser", "updateUser", "updateBot"]) {
-			client.on(ev, async (user) => {
-				await this.puppet.updateUser(await this.getUserParams(puppetId, user, p.data.team.id));
-			});
-		}
-		for (const ev of ["addChannel", "updateChannel"]) {
-			client.on(ev, async (chan) => {
-				log.verbose("Received slack event to update channel:", ev);
-				await this.puppet.updateRoom(await this.getRoomParams(puppetId, chan, p.data.team.id));
-			});
-		}
-		client.on("typing", async (data, isTyping) => {
-			const params = this.getSendParams(puppetId, data);
-			await this.puppet.setUserTyping(params, isTyping);
-		});
-		client.on("presence", async (data) => {
-			log.verbose("Received presence change", data);
-			if (!data.users) {
-				data.users = [];
-			}
-			if (data.user) {
-				data.users.push(data.user);
-			}
-			for (const user of data.users) {
-				let matrixPresence = {
-					active: "online",
-					away: "offline",
-				}[data.presence];
-				if (!matrixPresence) {
-					matrixPresence = "offline";
-				}
-				await this.puppet.setUserPresence({
-					userId: user,
-					puppetId,
-				}, matrixPresence);
+		client.on("messageChanged", async (msg1: Slack.Message, msg2: Slack.Message) => {
+			try {
+				log.verbose("Got new message changed event");
+				await this.handleSlackMessageChanged(puppetId, msg1, msg2);
+			} catch (err) {
+				log.error("Error handling slack messageChanged event", err);
 			}
 		});
-		client.on("reaction_added", async (data) => {
-			log.verbose("Received new reaction", data);
-			const params = this.getSendParams(puppetId, data);
-			const e = Emoji.get(data.reaction);
+		client.on("messageDeleted", async (msg: Slack.Message) => {
+			try {
+				log.verbose("Got new message deleted event");
+				await this.handleSlackMessageDeleted(puppetId, msg);
+			} catch (err) {
+				log.error("Error handling slack messageDeleted event", err);
+			}
+		});
+		for (const ev of ["addUser", "changeUser"]) {
+			client.on(ev, async (user: Slack.User) => {
+				await this.puppet.updateUser(await this.getUserParams(puppetId, user));
+			});
+		}
+		for (const ev of ["addChannel", "changeChannel"]) {
+			client.on(ev, async (chan: Slack.Channel) => {
+				await this.puppet.updateRoom(await this.getRoomParams(puppetId, chan));
+			});
+		}
+		client.on("typing", async (channel: Slack.Channel, user: Slack.User) => {
+			const params = await this.getSendParams(puppetId, channel, user);
+			await this.puppet.setUserTyping(params, true);
+		});
+		client.on("presenceChange", async (user: Slack.User, presence: string) => {
+			log.verbose("Received presence change");
+			let matrixPresence = {
+				active: "online",
+				away: "offline",
+			}[presence];
+			if (!matrixPresence) {
+				matrixPresence = "offline";
+			}
+			await this.puppet.setUserPresence({
+				userId: user.fullId,
+				puppetId,
+			}, matrixPresence);
+		});
+		client.on("reactionAdded", async (reaction: Slack.Reaction) => {
+			log.verbose("Received new reaction");
+			const params = await this.getSendParams(puppetId, reaction.message);
+			const e = Emoji.get(reaction.reaction);
 			if (!e) {
 				return;
 			}
-			await this.puppet.sendReaction(params, data.item.ts, e);
+			await this.puppet.sendReaction(params, reaction.message.ts, e);
 		});
 		p.client = client;
 		try {
@@ -288,12 +264,12 @@ export class Slack {
 		if (this.puppets[puppetId]) {
 			await this.removePuppet(puppetId);
 		}
-		const client = new Client(data.token);
+		const client = new Slack.Client({});
 		this.puppets[puppetId] = {
 			client,
 			data,
 			clientStopped: false,
-		} as ISlackPuppet;
+		};
 		await this.startClient(puppetId);
 	}
 
@@ -303,95 +279,38 @@ export class Slack {
 		await this.removePuppet(puppetId);
 	}
 
-	public async handleSlackMessage(puppetId: number, data: any) {
-		const params = this.getSendParams(puppetId, data);
+	public async handleSlackMessage(puppetId: number, msg: Slack.Message) {
+		console.log(msg);
+		console.log(msg.empty);
+		if (msg.empty && !msg.attachments && !msg.files) {
+			return; // nothing to do
+		}
+		const params = await this.getSendParams(puppetId, msg);
 		const client = this.puppets[puppetId].client;
-		const parserOpts = {
-			callbacks: {
-				getUser: async (id: string, name: string) => {
-					const user = await client.getUserById(id);
-					if (!user) {
-						return null;
-					}
-					return {
-						mxid: await this.puppet.getMxidForUser({
-							puppetId,
-							userId: id,
-						}),
-						name: user.name,
-					};
-				},
-				getChannel: async (id: string, name: string) => {
-					const chan = await client.getChannelById(id);
-					if (!chan) {
-						return null;
-					}
-					return {
-						mxid: await this.puppet.getMxidForRoom({
-							puppetId,
-							roomId: id,
-						}),
-						name: "#" + chan.name,
-					};
-				},
-				getUsergroup: async (id: string, name: string) => null,
-				getTeam: async (id: string, name: string) => null,
-				urlToMxc: async (url: string) => {
-					try {
-						return await this.puppet.uploadContent(this.puppet.AS.botIntent.underlyingClient, url);
-					} catch (err) {
-						log.error("Error uploading file:", err.error || err.body || err);
-					}
-					return null;
-				},
-			},
-		} as ISlackMessageParserOpts;
-		log.verbose(`Received message. subtype=${data.subtype} files=${data.files ? data.files.length : 0}`);
+		const parserOpts = this.getSlackMessageParserOpts(puppetId, msg.author.team);
+		log.verbose("Received message.");
 		const dedupeKey = `${puppetId};${params.room.roomId}`;
-		if (data.subtype === "channel_join") {
-			return; // we don't handle those
-		}
-		if (data.subtype === "message_changed") {
-			if (data.message.text === data.previous_message.text ||
-				await this.messageDeduplicator.dedupe(dedupeKey, params.user.userId, params.eventId, data.message.text)) {
-				// nothing to do
-				return;
-			}
-			const res = await this.slackMessageParser.FormatMessage(parserOpts, data.message);
-			await this.puppet.sendEdit(params, data.previous_message.ts, {
-				body: res.body,
-				formattedBody: res.formatted_body,
+		if (!(msg.empty || msg.attachments) && !await this.messageDeduplicator.dedupe(dedupeKey, params.user.userId, params.eventId, msg.text || "")) {
+			const res = await this.slackMessageParser.FormatMessage(parserOpts, {
+				text: msg.text || "",
+				blocks: msg.blocks || undefined,
 			});
-			return;
-		}
-		if (data.subtype === "message_deleted") {
-			await this.puppet.sendRedact(params, data.previous_message.ts);
-			return;
-		}
-		if (data.subtype === "message_replied" && !data.files) {
-			return;
-		}
-		if ((data.text || (data.attachments && data.attachments.length > 0) || (data.blocks && data.blocks.length > 0)) && !(
-			await this.messageDeduplicator.dedupe(dedupeKey, params.user.userId, params.eventId, data.text)
-		)) {
-			// send a normal message, if present
-			const res = await this.slackMessageParser.FormatMessage(parserOpts, data);
 			const opts = {
 				body: res.body,
 				formattedBody: res.formatted_body,
-				emote: data.subtype === "me_message",
+				emote: msg.meMessage,
 			};
-			if (data.thread_ts) {
-				const replyTs = this.threadSendTs[data.thread_ts] || data.thread_ts;
-				this.threadSendTs[data.thread_ts] = data.ts;
+			if (msg.threadTs) {
+				const replyTs = this.threadSendTs[msg.threadTs] || msg.threadTs;
+				this.threadSendTs[msg.threadTs] = msg.ts;
 				await this.puppet.sendReply(params, replyTs, opts);
 			} else {
 				await this.puppet.sendMessage(params, opts);
 			}
 		}
-		if (data.files) {
+		if (msg.files) {
 			// this has files
-			for (const f of data.files) {
+			for (const f of msg.files) {
 				if (f.title &&
 					await this.messageDeduplicator.dedupe(dedupeKey, params.user.userId, params.eventId, "file:" + f.title)) {
 					// skip this, we sent it!
@@ -417,9 +336,41 @@ export class Slack {
 		}
 	}
 
+	public async handleSlackMessageChanged(puppetId: number, msg1: Slack.Message, msg2: Slack.Message) {
+		if (msg1.text === msg2.text) {
+			return;
+		}
+		const params = await this.getSendParams(puppetId, msg2);
+		const client = this.puppets[puppetId].client;
+		const parserOpts = this.getSlackMessageParserOpts(puppetId, msg1.author.team);
+		log.verbose("Received message edit");
+		const dedupeKey = `${puppetId};${params.room.roomId}`;
+		if (await this.messageDeduplicator.dedupe(dedupeKey, params.user.userId, params.eventId, msg2.text || "")) {
+			return;
+		}
+		const res = await this.slackMessageParser.FormatMessage(parserOpts, {
+			text: msg2.text || "",
+			blocks: msg2.blocks || undefined,
+		});
+		await this.puppet.sendEdit(params, msg1.ts, {
+			body: res.body,
+			formattedBody: res.formatted_body,
+		});
+	}
+
+	public async handleSlackMessageDeleted(puppetId: number, msg: Slack.Message) {
+		const params = await this.getSendParams(puppetId, msg);
+		await this.puppet.sendRedact(params, msg.ts);
+	}
+
 	public async handleMatrixMessage(room: IRemoteRoom, data: IMessageEvent, asUser: ISendingUser | null, event: any) {
 		const p = this.puppets[room.puppetId];
 		if (!p) {
+			return;
+		}
+		const chan = p.client.getChannel(room.roomId);
+		if (!chan) {
+			log.warn(`Room ${room.roomId} not found!`);
 			return;
 		}
 		const msg = await this.matrixMessageParser.FormatMessage(
@@ -430,9 +381,11 @@ export class Slack {
 		this.messageDeduplicator.lock(dedupeKey, p.data.self.id, msg.text);
 		let eventId = "";
 		if (data.emote) {
-			eventId = await p.client.sendMeMessage(msg, room.roomId.split("-")[1]);
+			eventId = await chan.sendMeMessage(msg);
 		} else {
-			eventId = await p.client.sendMessage(msg, room.roomId.split("-")[1]);
+			eventId = await chan.sendMessage(msg, {
+				asUser: true,
+			});
 		}
 		this.messageDeduplicator.unlock(dedupeKey, p.data.self.id, eventId);
 		if (eventId) {
@@ -451,13 +404,18 @@ export class Slack {
 		if (!p) {
 			return;
 		}
+		const chan = p.client.getChannel(room.roomId);
+		if (!chan) {
+			log.warn(`Room ${room.roomId} not found!`);
+			return;
+		}
 		const msg = await this.matrixMessageParser.FormatMessage(
 			this.getMatrixMessageParserOpts(room.puppetId),
 			event.content["m.new_content"],
 		);
 		const dedupeKey = `${room.puppetId};${room.roomId}`;
 		this.messageDeduplicator.lock(dedupeKey, p.data.self.id, msg.text);
-		const newEventId = await p.client.editMessage(msg, room.roomId, eventId);
+		const newEventId = await chan.editMessage(msg, eventId);
 		this.messageDeduplicator.unlock(dedupeKey, p.data.self.id, newEventId);
 		if (newEventId) {
 			await this.puppet.eventStore.insert(room.puppetId, data.eventId!, newEventId);
@@ -476,6 +434,11 @@ export class Slack {
 			return;
 		}
 		log.verbose(`Got reply to send of ts=${eventId}`);
+		const chan = p.client.getChannel(room.roomId);
+		if (!chan) {
+			log.warn(`Room ${room.roomId} not found!`);
+			return;
+		}
 		let tsThread = eventId;
 		while (this.tsThreads[tsThread]) {
 			tsThread = this.tsThreads[tsThread];
@@ -487,7 +450,10 @@ export class Slack {
 		);
 		const dedupeKey = `${room.puppetId};${room.roomId}`;
 		this.messageDeduplicator.lock(dedupeKey, p.data.self.id, msg.text);
-		const newEventId = await p.client.replyMessage(msg, room.roomId, tsThread);
+		const newEventId = await chan.sendMessage(msg, {
+			asUser: true,
+			threadTs: tsThread,
+		});
 		this.messageDeduplicator.unlock(dedupeKey, p.data.self.id, newEventId);
 		if (newEventId) {
 			this.tsThreads[newEventId] = tsThread;
@@ -500,19 +466,29 @@ export class Slack {
 		if (!p) {
 			return;
 		}
-		await p.client.deleteMessage(room.roomId, eventId);
+		const chan = p.client.getChannel(room.roomId);
+		if (!chan) {
+			log.warn(`Room ${room.roomId} not found!`);
+			return;
+		}
+		await chan.deleteMessage(eventId);
 	}
 
-	public async handleMatrixReaction(room: IRemoteRoom, eventId: string, asUser: ISendingUser | null, reaction: string) {
+	public async handleMatrixReaction(room: IRemoteRoom, eventId: string, reaction: string, asUser: ISendingUser | null) {
 		const p = this.puppets[room.puppetId];
 		if (!p) {
+			return;
+		}
+		const chan = p.client.getChannel(room.roomId);
+		if (!chan) {
+			log.warn(`Room ${room.roomId} not found!`);
 			return;
 		}
 		const e = Emoji.find(reaction);
 		if (!e) {
 			return;
 		}
-		await p.client.sendReaction(room.roomId, eventId, e.key);
+		await chan.sendReaction(eventId, e.key);
 	}
 
 	public async handleMatrixFile(
@@ -525,57 +501,57 @@ export class Slack {
 		if (!p) {
 			return;
 		}
+		const chan = p.client.getChannel(room.roomId);
+		if (!chan) {
+			log.warn(`Room ${room.roomId} not found!`);
+			return;
+		}
 		const dedupeKey = `${room.puppetId};${room.roomId}`;
 		this.messageDeduplicator.lock(dedupeKey, p.data.self.id, "file:" + data.filename);
-		const eventId = await this.puppets[room.puppetId].client.sendFileMessage(data.url, data.filename, room.roomId);
+		const eventId = await chan.sendFile(data.url, data.filename);
 		this.messageDeduplicator.unlock(dedupeKey, p.data.self.id, eventId);
 		if (eventId) {
 			await this.puppet.eventStore.insert(room.puppetId, data.eventId!, eventId);
 		}
 	}
 
-	public async createRoom(oldChan: IRemoteRoom): Promise<IRemoteRoom | null> {
-		const p = this.puppets[oldChan.puppetId];
+	public async createRoom(room: IRemoteRoom): Promise<IRemoteRoom | null> {
+		const p = this.puppets[room.puppetId];
 		if (!p) {
 			return null;
 		}
-		log.info(`Received create request for channel update puppetId=${oldChan.puppetId} roomId=${oldChan.roomId}`);
-		const [teamId, roomId] = oldChan.roomId.split("-");
-		const chan = await p.client.getRoomById(roomId);
+		log.info(`Received create request for channel update puppetId=${room.puppetId} roomId=${room.roomId}`);
+		const chan = p.client.getChannel(room.roomId);
 		if (!chan) {
 			return null;
 		}
-		return await this.getRoomParams(oldChan.puppetId, chan, teamId);
+		return await this.getRoomParams(room.puppetId, chan);
 	}
 
-	public async createUser(oldUser: IRemoteUser): Promise<IRemoteUser | null> {
-		const p = this.puppets[oldUser.puppetId];
+	public async createUser(remoteUser: IRemoteUser): Promise<IRemoteUser | null> {
+		const p = this.puppets[remoteUser.puppetId];
 		if (!p) {
 			return null;
 		}
-		log.info(`Received create request for user update puppetId=${oldUser.puppetId} userId=${oldUser.userId}`);
-		const [teamId, userId] = oldUser.userId.split("-");
-		let user = await p.client.getUserById(userId);
-		if (!user) {
-			user = await p.client.getBotById(userId);
-		}
+		log.info(`Received create request for user update puppetId=${remoteUser.puppetId} userId=${remoteUser.userId}`);
+		const user = p.client.getUser(remoteUser.userId);
 		if (!user) {
 			return null;
 		}
-		return await this.getUserParams(oldUser.puppetId, user, teamId);
+		return await this.getUserParams(remoteUser.puppetId, user);
 	}
 
-	public async getDmRoom(user: IRemoteUser): Promise<string | null> {
-		const p = this.puppets[user.puppetId];
+	public async getDmRoom(remoteUser: IRemoteUser): Promise<string | null> {
+		const p = this.puppets[remoteUser.puppetId];
 		if (!p) {
 			return null;
 		}
-		const [teamId, userId] = user.userId.split("-");
-		const roomId = await p.client.getRoomForUser(userId);
-		if (!roomId) {
+		const user = p.client.getUser(remoteUser.userId);
+		if (!user) {
 			return null;
 		}
-		return `${teamId}-${roomId}`;
+		const chan = await user.im();
+		return chan ? chan.id : null;
 	}
 
 	public async listUsers(puppetId: number): Promise<IRetList[]> {
@@ -584,12 +560,20 @@ export class Slack {
 			return [];
 		}
 		const reply: IRetList[] = [];
-		const users = await p.client.listUsers();
-		for (const u of users) {
+		for (const [, team] of p.client.teams) {
+			if (team.partial) {
+				await team.load();
+			}
 			reply.push({
-				id: `${p.data.team.id}-${u.id}`,
-				name: u.profile ? u.profile.display_name : u.name,
+				category: true,
+				name: team.name,
 			});
+			for (const [, user] of team.users) {
+				reply.push({
+					id: user.fullId,
+					name: user.displayName,
+				});
+			}
 		}
 		return reply;
 	}
@@ -600,12 +584,22 @@ export class Slack {
 			return [];
 		}
 		const reply: IRetList[] = [];
-		const channels = await p.client.listChannels();
-		for (const c of channels) {
+		for (const [, team] of p.client.teams) {
+			if (team.partial) {
+				await team.load();
+			}
 			reply.push({
-				id: `${p.data.team.id}-${c.id}`,
-				name: c.name,
+				category: true,
+				name: team.name,
 			});
+			for (const [, chan] of team.channels) {
+				if (chan.type !== "im") {
+					reply.push({
+						id: chan.fullId,
+						name: chan.name || chan.fullId,
+					});
+				}
+			}
 		}
 		return reply;
 	}
@@ -617,14 +611,14 @@ export class Slack {
 				canNotifyRoom: async () => true,
 				getUserId: async (mxid: string) => {
 					const parts = this.puppet.userSync.getPartsFromMxid(mxid);
-					if (!parts || parts.puppetId !== puppetId) {
+					if (!parts || (parts.puppetId !== puppetId && parts.puppetId !== -1)) {
 						return null;
 					}
 					return parts.userId.split("-")[1] || null;
 				},
 				getChannelId: async (mxid: string) => {
 					const parts = await this.puppet.roomSync.getPartsFromMxid(mxid);
-					if (!parts || parts.puppetId !== puppetId) {
+					if (!parts || (parts.puppetId !== puppetId && parts.puppetId !== -1)) {
 						return null;
 					}
 					return parts.roomId.split("-")[1] || null;
@@ -634,32 +628,47 @@ export class Slack {
 		};
 	}
 
-	private getImageKeyFromObject(o: any): string | undefined {
-		if (!o) {
-			return undefined;
-		}
-		return Object.keys(o).filter((el) => {
-			return el.startsWith("image_");
-		}).sort((e1, e2) => {
-			const n1 = e1.substring("image_".length);
-			const n2 = e2.substring("image_".length);
-			// we want to sort "original" to the top
-			if (n1 === "original") {
-				return -1;
-			}
-			if (n2 === "original") {
-				return 1;
-			}
-			// buuut everything else to the bottom
-			const nn1 = Number(n1);
-			const nn2 = Number(n2);
-			if (isNaN(nn1)) {
-				return 1;
-			}
-			if (isNaN(nn2)) {
-				return -1;
-			}
-			return nn2 - nn1;
-		})[0];
+	private getSlackMessageParserOpts(puppetId: number, team: Slack.Team): ISlackMessageParserOpts {
+		const client = this.puppets[puppetId].client;
+		return {
+			callbacks: {
+				getUser: async (id: string, name: string) => {
+					const user = client.getUser(id, team.id);
+					if (!user) {
+						return null;
+					}
+					return {
+						mxid: await this.puppet.getMxidForUser({
+							puppetId,
+							userId: user.fullId,
+						}),
+						name: user.name,
+					};
+				},
+				getChannel: async (id: string, name: string) => {
+					const chan = client.getChannel(id, team.id);
+					if (!chan) {
+						return null;
+					}
+					return {
+						mxid: await this.puppet.getMxidForRoom({
+							puppetId,
+							roomId: chan.fullId,
+						}),
+						name: "#" + chan.name,
+					};
+				},
+				getUsergroup: async (id: string, name: string) => null,
+				getTeam: async (id: string, name: string) => null,
+				urlToMxc: async (url: string) => {
+					try {
+						return await this.puppet.uploadContent(null, url);
+					} catch (err) {
+						log.error("Error uploading file:", err.error || err.body || err);
+					}
+					return null;
+				},
+			},
+		};
 	}
 }

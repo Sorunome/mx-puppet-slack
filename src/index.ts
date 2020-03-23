@@ -6,11 +6,12 @@ import {
 } from "mx-puppet-bridge";
 import * as commandLineArgs from "command-line-args";
 import * as commandLineUsage from "command-line-usage";
-import { Slack } from "./slack";
+import { App } from "./slack";
 import { SlackConfigWrap } from "./config";
 import * as fs from "fs";
 import * as yaml from "js-yaml";
 import { oauthCallback, getDataFromStrHook } from "./oauth";
+import { Logger } from "soru-slack-client";
 
 const log = new Log("SlackPuppet:index");
 
@@ -64,7 +65,7 @@ const puppet = new PuppetBridge(options["registration-file"], options.config, pr
 
 if (options.register) {
 	// okay, all we have to do is generate a registration file
-	puppet.readConfig();
+	puppet.readConfig(false);
 	try {
 		puppet.generateRegistration({
 			prefix: "_slackpuppet_",
@@ -85,6 +86,30 @@ function readConfig() {
 	config.applyConfig(yaml.safeLoad(fs.readFileSync(options.config)));
 }
 
+function registerLogging() {
+	const logMap = new Map<string, Log>();
+	const getLogFunc = (level: string) => {
+		// tslint:disable-next-line no-any
+		return (mod: string, args: any[]) => {
+			mod = "SlackClient:" + mod;
+			let logger = logMap.get(mod);
+			if (!logger) {
+				logger = new Log(mod);
+				logMap.set(mod, logger);
+			}
+			logger[level](...args);
+		};
+	};
+	Logger.setLogger({
+		silly: getLogFunc("silly"),
+		debug: getLogFunc("debug"),
+		verbose: getLogFunc("verbose"),
+		info: getLogFunc("info"),
+		warn: getLogFunc("warn"),
+		error: getLogFunc("error"),
+	});
+}
+
 export function Config(): SlackConfigWrap {
 	return config;
 }
@@ -94,9 +119,10 @@ export function Puppet(): PuppetBridge {
 }
 
 async function run() {
+	registerLogging();
 	await puppet.init();
 	readConfig();
-	const slack = new Slack(puppet);
+	const slack = new App(puppet);
 	await slack.init();
 	puppet.on("puppetNew", slack.newPuppet.bind(slack));
 	puppet.on("puppetDelete", slack.deletePuppet.bind(slack));
