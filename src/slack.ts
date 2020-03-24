@@ -432,7 +432,7 @@ export class App {
 		}
 		this.messageDeduplicator.unlock(dedupeKey, p.data.self.id, eventId);
 		if (eventId) {
-			await this.puppet.eventStore.insert(room.puppetId, data.eventId!, eventId);
+			await this.puppet.eventSync.insert(room.puppetId, data.eventId!, eventId);
 		}
 	}
 
@@ -461,7 +461,7 @@ export class App {
 		const newEventId = await chan.editMessage(msg, eventId);
 		this.messageDeduplicator.unlock(dedupeKey, p.data.self.id, newEventId);
 		if (newEventId) {
-			await this.puppet.eventStore.insert(room.puppetId, data.eventId!, newEventId);
+			await this.puppet.eventSync.insert(room.puppetId, data.eventId!, newEventId);
 		}
 	}
 
@@ -500,7 +500,7 @@ export class App {
 		this.messageDeduplicator.unlock(dedupeKey, p.data.self.id, newEventId);
 		if (newEventId) {
 			this.tsThreads[newEventId] = tsThread;
-			await this.puppet.eventStore.insert(room.puppetId, data.eventId!, newEventId);
+			await this.puppet.eventSync.insert(room.puppetId, data.eventId!, newEventId);
 		}
 	}
 
@@ -554,7 +554,7 @@ export class App {
 		const eventId = await chan.sendFile(data.url, data.filename);
 		this.messageDeduplicator.unlock(dedupeKey, p.data.self.id, eventId);
 		if (eventId) {
-			await this.puppet.eventStore.insert(room.puppetId, data.eventId!, eventId);
+			await this.puppet.eventSync.insert(room.puppetId, data.eventId!, eventId);
 		}
 	}
 
