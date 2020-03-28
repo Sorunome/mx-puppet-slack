@@ -21,11 +21,15 @@ Also check the config for other values, like your homeserver domain.
 
 ```
 git clone https://github.com/Sorunome/mx-puppet-slack.git
-cd sample.config.yaml
+cd mx-puppet-slack
 npm install
 cp sample.config.yaml config.yaml
 # fill info about your homeserver and Slack app credentials to config.yaml manually
 npm run start -- -r # generate registration file
+```
+* Add the registration file to the list under `app_service_config_files:` in your synapse config.
+* Restart synapse.
+```
 npm run start
 ```
 
