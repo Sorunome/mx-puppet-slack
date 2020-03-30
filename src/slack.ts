@@ -167,6 +167,7 @@ export class App {
 
 	public async removePuppet(puppetId: number) {
 		log.info(`Removing puppet: puppetId=${puppetId}`);
+		await this.stopClient(puppetId);
 		delete this.puppets[puppetId];
 	}
 
