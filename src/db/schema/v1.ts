@@ -92,7 +92,7 @@ export class Schema implements IDbSchema {
 		await store.createTable(`
 			CREATE TABLE slack_schema (
 				version	INTEGER UNIQUE NOT NULL
-			);`, "discord_schema");
+			);`, "slack_schema");
 		await store.db.Exec("INSERT INTO slack_schema VALUES (0);");
 		await store.createTable(`
 			CREATE TABLE slack_tokenstore (
