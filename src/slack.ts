@@ -21,6 +21,7 @@ import * as Emoji from "node-emoji";
 import { SlackProvisioningAPI } from "./api";
 import { SlackStore } from "./store";
 import * as escapeHtml from "escape-html";
+import { Config } from "./index";
 
 const log = new Log("SlackPuppet:slack");
 
@@ -191,6 +192,24 @@ export class App {
 		}
 		if (p.data.cookie) {
 			opts.cookie = p.data.cookie;
+		}
+		if (p.data.appId) {
+			opts.events = {
+				express: {
+					app: this.puppet.AS.expressAppInstance,
+					path: Config().slack.path,
+				},
+				appId: p.data.appId,
+				clientId: p.data.clientId,
+				clientSecret: p.data.clientSecret,
+				signingSecret: p.data.signingSecret,
+				storeToken: async (t: Slack.IStoreToken) => {
+					await this.store.storeToken(puppetId, t);
+				},
+				getTokens: async (): Promise<Slack.IStoreToken[]> => {
+					return await this.store.getTokens(puppetId);
+				},
+			};
 		}
 		const client = new Slack.Client(opts);
 		client.on("connected", async () => {

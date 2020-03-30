@@ -67,10 +67,29 @@ export const getDataFromStrHook = async (str: string): Promise<IRetData> => {
 		}
 		cookie = parts[1];
 	}
+	if (token.startsWith("xox")) {
+		retData.success = true;
+		retData.data = {
+			token,
+			cookie,
+		};
+		return retData;
+	}
+	const LENGTH_EVENTS_API_APP = 4;
+	const INDEX_APP_ID = 0;
+	const INDEX_CLIENT_ID = 1;
+	const INDEX_CLIENT_SECRET = 2;
+	const INDEX_SIGNING_SECRET = 3;
+	if (parts.length !== LENGTH_EVENTS_API_APP) {
+		retData.error = "Link a slack app with `link <appId> <clientId> <clientSecret> <signingSecret>`";
+		return retData;
+	}
 	retData.success = true;
 	retData.data = {
-		token,
-		cookie,
+		appId: parts[INDEX_APP_ID],
+		clientId: parts[INDEX_CLIENT_ID],
+		clientSecret: parts[INDEX_CLIENT_SECRET],
+		signingSecret: parts[INDEX_SIGNING_SECRET],
 	};
 	return retData;
 };

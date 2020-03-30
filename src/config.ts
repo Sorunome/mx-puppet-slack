@@ -1,5 +1,6 @@
 export class SlackConfigWrap {
 	public oauth: OAuthConfig = new OAuthConfig();
+	public slack: SlackConfig = new SlackConfig();
 
 	public applyConfig(newConfig: {[key: string]: any}, configLayer: {[key: string]: any} = this) {
 		Object.keys(newConfig).forEach((key) => {
@@ -18,4 +19,8 @@ class OAuthConfig {
 	public clientSecret = "";
 	public redirectPath = "";
 	public redirectUri = "";
+}
+
+class SlackConfig {
+	public path: string = "/_matrix/slack/client";
 }
