@@ -658,13 +658,18 @@ export class App {
 		if (!p) {
 			return;
 		}
-		if (asUser && p.data.appId) {
-			const chan = p.client.getChannel(room.roomId);
-			if (!chan) {
-				log.warn(`Room ${room.roomId} not found!`);
-				return;
-			}
-			const eventId = await chan.sendMessage({
+		if (!asUser) {
+			await this.handleMatrixFile(room, data, asUser, event);
+			return;
+		}
+		const chan = p.client.getChannel(room.roomId);
+		if (!chan) {
+			log.warn(`Room ${room.roomId} not found!`);
+			return;
+		}
+		let eventId = "";
+		if (p.data.appId) {
+			eventId = await chan.sendMessage({
 				text: "Please enable blocks...",
 				blocks: [{
 					type: "image",
@@ -680,11 +685,24 @@ export class App {
 				username: asUser.displayname,
 				iconUrl: asUser.avatarUrl,
 			});
-			if (eventId) {
-				await this.puppet.eventSync.insert(room.puppetId, data.eventId!, eventId);
-			}
-		} else {
-			await this.handleMatrixFile(room, data, asUser, event);
+		} else if (asUser) {
+			eventId = await chan.sendMessage({
+				text: "Please enable blocks...",
+				blocks: [{
+					type: "image",
+					title: {
+						type: "plain_text",
+						text: `${asUser.displayname} just uploaded an image, ${data.filename}`,
+					},
+					image_url: data.url,
+					alt_text: data.filename,
+				}],
+			}, {
+				asUser: true,
+			});
+		}
+		if (eventId) {
+			await this.puppet.eventSync.insert(room.puppetId, data.eventId!, eventId);
 		}
 	}
 
@@ -711,6 +729,10 @@ export class App {
 				asUser: false,
 				username: asUser.displayname,
 				iconUrl: asUser.avatarUrl,
+			});
+		} else if (asUser) {
+			eventId = await chan.sendMessage(`${asUser.displayname} uploaded a file: <${data.url}|${data.filename}>`, {
+				asUser: true,
 			});
 		} else {
 			eventId = await chan.sendFile(data.url, data.filename);
