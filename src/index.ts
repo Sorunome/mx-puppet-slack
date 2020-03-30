@@ -45,11 +45,13 @@ if (options.help) {
 
 const protocol = {
 	features: {
+		image: true, // images are special-cased if relayed
 		file: true, // no need for the others as we auto-detect types anyways
 		presence: true,
 		typingTimeout: 5500,
 		edit: true,
 		reply: true,
+		advancedRelay: true,
 		globalNamespace: true,
 	},
 	id: "slack",
@@ -132,6 +134,7 @@ async function run() {
 	puppet.on("reply", slack.handleMatrixReply.bind(slack));
 	puppet.on("redact", slack.handleMatrixRedact.bind(slack));
 	puppet.on("reaction", slack.handleMatrixReaction.bind(slack));
+	puppet.on("image", slack.handleMatrixImage.bind(slack));
 	puppet.on("file", slack.handleMatrixFile.bind(slack));
 	puppet.setCreateUserHook(slack.createUser.bind(slack));
 	puppet.setCreateRoomHook(slack.createRoom.bind(slack));

@@ -347,6 +347,15 @@ export class App {
 		if (msg.empty && !msg.attachments && !msg.files) {
 			return; // nothing to do
 		}
+		if (msg.author instanceof Slack.Bot) {
+			const appUserId = msg.client.users.get(msg.author.team.id);
+			if (msg.author.partial) {
+				await msg.author.load();
+			}
+			if (appUserId && msg.author.user && appUserId.id === msg.author.user.id) {
+				return;
+			}
+		}
 		const params = await this.getSendParams(puppetId, msg);
 		const client = this.puppets[puppetId].client;
 		const parserOpts = this.getSlackMessageParserOpts(puppetId, msg.author.team);
@@ -403,6 +412,15 @@ export class App {
 		if (msg1.text === msg2.text) {
 			return;
 		}
+		if (msg1.author instanceof Slack.Bot) {
+			const appUserId = msg1.client.users.get(msg1.author.team.id);
+			if (msg1.author.partial) {
+				await msg1.author.load();
+			}
+			if (appUserId && msg1.author.user && appUserId.id === msg1.author.user.id) {
+				return;
+			}
+		}
 		const params = await this.getSendParams(puppetId, msg2);
 		const client = this.puppets[puppetId].client;
 		const parserOpts = this.getSlackMessageParserOpts(puppetId, msg1.author.team);
@@ -422,6 +440,15 @@ export class App {
 	}
 
 	public async handleSlackMessageDeleted(puppetId: number, msg: Slack.Message) {
+		if (msg.author instanceof Slack.Bot) {
+			const appUserId = msg.client.users.get(msg.author.team.id);
+			if (msg.author.partial) {
+				await msg.author.load();
+			}
+			if (appUserId && msg.author.user && appUserId.id === msg.author.user.id) {
+				return;
+			}
+		}
 		const params = await this.getSendParams(puppetId, msg);
 		await this.puppet.sendRedact(params, msg.ts);
 	}
@@ -440,10 +467,26 @@ export class App {
 			this.getMatrixMessageParserOpts(room.puppetId),
 			event.content,
 		);
+		if (asUser) {
+			if (data.emote) {
+				msg.text = `_${msg.text}_`;
+			}
+			data.emote = false;
+			// add the fallback
+			if (!p.data.appId) {
+				msg.text = `*${asUser.displayname}*: ${msg.text}`;
+			}
+		}
 		const dedupeKey = `${room.puppetId};${room.roomId}`;
 		this.messageDeduplicator.lock(dedupeKey, p.data.self.id, msg.text);
 		let eventId = "";
-		if (data.emote) {
+		if (asUser && p.data.appId) {
+			eventId = await chan.sendMessage(msg, {
+				asUser: false,
+				username: asUser.displayname,
+				iconUrl: asUser.avatarUrl,
+			});
+		} else if (data.emote) {
 			eventId = await chan.sendMeMessage(msg);
 		} else {
 			eventId = await chan.sendMessage(msg, {
@@ -476,9 +519,30 @@ export class App {
 			this.getMatrixMessageParserOpts(room.puppetId),
 			event.content["m.new_content"],
 		);
+		if (asUser) {
+			if (data.emote) {
+				msg.text = `_${msg.text}_`;
+			}
+			data.emote = false;
+			// add the fallback
+			if (!p.data.appId) {
+				msg.text = `*${asUser.displayname}*: ${msg.text}`;
+			}
+		}
 		const dedupeKey = `${room.puppetId};${room.roomId}`;
 		this.messageDeduplicator.lock(dedupeKey, p.data.self.id, msg.text);
-		const newEventId = await chan.editMessage(msg, eventId);
+		let newEventId = "";
+		if (asUser && p.data.appId) {
+			newEventId = await chan.editMessage(msg, eventId, {
+				asUser: false,
+				username: asUser.displayname,
+				iconUrl: asUser.avatarUrl,
+			});
+		} else {
+			newEventId = await chan.editMessage(msg, eventId, {
+				asUser: true,
+			});
+		}
 		this.messageDeduplicator.unlock(dedupeKey, p.data.self.id, newEventId);
 		if (newEventId) {
 			await this.puppet.eventSync.insert(room.puppetId, data.eventId!, newEventId);
@@ -511,12 +575,32 @@ export class App {
 			this.getMatrixMessageParserOpts(room.puppetId),
 			event.content,
 		);
+		if (asUser) {
+			if (data.emote) {
+				msg.text = `_${msg.text}_`;
+			}
+			data.emote = false;
+			// add the fallback
+			if (!p.data.appId) {
+				msg.text = `*${asUser.displayname}*: ${msg.text}`;
+			}
+		}
 		const dedupeKey = `${room.puppetId};${room.roomId}`;
 		this.messageDeduplicator.lock(dedupeKey, p.data.self.id, msg.text);
-		const newEventId = await chan.sendMessage(msg, {
-			asUser: true,
-			threadTs: tsThread,
-		});
+		let newEventId = "";
+		if (asUser && p.data.appId) {
+			newEventId = await chan.sendMessage(msg, {
+				asUser: false,
+				username: asUser.displayname,
+				iconUrl: asUser.avatarUrl,
+				threadTs: tsThread,
+			});
+		} else {
+			newEventId = await chan.sendMessage(msg, {
+				asUser: true,
+				threadTs: tsThread,
+			});
+		}
 		this.messageDeduplicator.unlock(dedupeKey, p.data.self.id, newEventId);
 		if (newEventId) {
 			this.tsThreads[newEventId] = tsThread;
@@ -534,12 +618,22 @@ export class App {
 			log.warn(`Room ${room.roomId} not found!`);
 			return;
 		}
-		await chan.deleteMessage(eventId);
+		if (asUser && p.data.appId) {
+			await chan.deleteMessage(eventId, {
+				asUser: true,
+				username: asUser.displayname,
+				iconUrl: asUser.avatarUrl,
+			});
+		} else {
+			await chan.deleteMessage(eventId, {
+				asUser: true,
+			});
+		}
 	}
 
 	public async handleMatrixReaction(room: IRemoteRoom, eventId: string, reaction: string, asUser: ISendingUser | null) {
 		const p = this.puppets[room.puppetId];
-		if (!p) {
+		if (!p || asUser) {
 			return;
 		}
 		const chan = p.client.getChannel(room.roomId);
@@ -552,6 +646,46 @@ export class App {
 			return;
 		}
 		await chan.sendReaction(eventId, e.key);
+	}
+
+	public async handleMatrixImage(
+		room: IRemoteRoom,
+		data: IFileEvent,
+		asUser: ISendingUser | null,
+		event: any,
+	) {
+		const p = this.puppets[room.puppetId];
+		if (!p) {
+			return;
+		}
+		if (asUser && p.data.appId) {
+			const chan = p.client.getChannel(room.roomId);
+			if (!chan) {
+				log.warn(`Room ${room.roomId} not found!`);
+				return;
+			}
+			const eventId = await chan.sendMessage({
+				text: "Please enable blocks...",
+				blocks: [{
+					type: "image",
+					title: {
+						type: "plain_text",
+						text: data.filename,
+					},
+					image_url: data.url,
+					alt_text: data.filename,
+				}],
+			}, {
+				asUser: false,
+				username: asUser.displayname,
+				iconUrl: asUser.avatarUrl,
+			});
+			if (eventId) {
+				await this.puppet.eventSync.insert(room.puppetId, data.eventId!, eventId);
+			}
+		} else {
+			await this.handleMatrixFile(room, data, asUser, event);
+		}
 	}
 
 	public async handleMatrixFile(
@@ -571,7 +705,16 @@ export class App {
 		}
 		const dedupeKey = `${room.puppetId};${room.roomId}`;
 		this.messageDeduplicator.lock(dedupeKey, p.data.self.id, "file:" + data.filename);
-		const eventId = await chan.sendFile(data.url, data.filename);
+		let eventId = "";
+		if (asUser && p.data.appId) {
+			eventId = await chan.sendMessage(`Uploaded a file: <${data.url}|${data.filename}>`, {
+				asUser: false,
+				username: asUser.displayname,
+				iconUrl: asUser.avatarUrl,
+			});
+		} else {
+			eventId = await chan.sendFile(data.url, data.filename);
+		}
 		this.messageDeduplicator.unlock(dedupeKey, p.data.self.id, eventId);
 		if (eventId) {
 			await this.puppet.eventSync.insert(room.puppetId, data.eventId!, eventId);
