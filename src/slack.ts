@@ -362,11 +362,12 @@ export class App {
 		const parserOpts = this.getSlackMessageParserOpts(puppetId, msg.author.team);
 		log.verbose("Received message.");
 		const dedupeKey = `${puppetId};${params.room.roomId}`;
-		if (!(msg.empty || msg.attachments) &&
+		if (!(msg.empty && !msg.attachments) &&
 			!await this.messageDeduplicator.dedupe(dedupeKey, params.user.userId, params.eventId, msg.text || "")) {
 			const res = await this.slackMessageParser.FormatMessage(parserOpts, {
 				text: msg.text || "",
 				blocks: msg.blocks || undefined,
+				attachments: msg.attachments || undefined
 			});
 			const opts = {
 				body: res.body,
