@@ -478,6 +478,21 @@ export class App {
 			this.getMatrixMessageParserOpts(room.puppetId),
 			event.content,
 		);
+
+		if (msg.text.startsWith("/")) {
+			let fullCommand = msg.text;
+			let commandParametersSplitPoint = fullCommand.indexOf(" ");
+			if (commandParametersSplitPoint < 0) {
+				chan.sendCommand(fullCommand, undefined)
+			} else {
+				let command = fullCommand.substr(0, commandParametersSplitPoint);
+				let parameters = fullCommand.substr(commandParametersSplitPoint + 1);
+				chan.sendCommand(command, parameters)
+			}
+
+			return;
+		}
+
 		if (asUser) {
 			if (data.emote) {
 				msg.text = `_${msg.text}_`;
