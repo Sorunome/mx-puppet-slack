@@ -238,6 +238,7 @@ export class App {
 			const MINUTE = 60000;
 			await Util.sleep(MINUTE);
 			try {
+				await this.stopClient(puppetId);
 				await this.startClient(puppetId);
 			} catch (err) {
 				log.warn("Failed to restart client", err);
