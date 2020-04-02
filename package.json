@@ -20,7 +20,7 @@
     "matrix-slack-parser": "0.0.1",
     "mx-puppet-bridge": "0.0.35-5",
     "node-emoji": "^1.10.0",
-    "soru-slack-client": "0.0.7",
+    "soru-slack-client": "0.0.8",
     "tslint": "^5.17.0",
     "typescript": "^3.7.4",
     "useragent-generator": "^1.1.1-amkt-22079-finish.0"
