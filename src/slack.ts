@@ -794,7 +794,7 @@ export class App {
 			return null;
 		}
 		const chan = await user.im();
-		return chan ? chan.id : null;
+		return chan ? chan.fullId : null;
 	}
 
 	public async listUsers(puppetId: number): Promise<IRetList[]> {
