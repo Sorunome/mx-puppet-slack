@@ -314,6 +314,15 @@ export class App {
 			}
 			await this.puppet.sendReaction(params, reaction.message.ts, e);
 		});
+		client.on("reactionRemoved", async (reaction: Slack.Reaction) => {
+			log.verbose("Received reaction remove");
+			const params = await this.getSendParams(puppetId, reaction.message);
+			const e = Emoji.get(reaction.reaction);
+			if (!e) {
+				return;
+			}
+			await this.puppet.removeReaction(params, reaction.message.ts, e);
+		});
 		p.client = client;
 		try {
 			await client.connect();
@@ -359,7 +368,7 @@ export class App {
 		}
 		const params = await this.getSendParams(puppetId, msg);
 		const client = this.puppets[puppetId].client;
-		const parserOpts = this.getSlackMessageParserOpts(puppetId, msg.author.team);
+		const parserOpts = this.getSlackMessageParserOpts(puppetId, msg.channel.team);
 		log.verbose("Received message.");
 		const dedupeKey = `${puppetId};${params.room.roomId}`;
 		if (!(msg.empty && !msg.attachments) &&
@@ -425,7 +434,7 @@ export class App {
 		}
 		const params = await this.getSendParams(puppetId, msg2);
 		const client = this.puppets[puppetId].client;
-		const parserOpts = this.getSlackMessageParserOpts(puppetId, msg1.author.team);
+		const parserOpts = this.getSlackMessageParserOpts(puppetId, msg1.channel.team);
 		log.verbose("Received message edit");
 		const dedupeKey = `${puppetId};${params.room.roomId}`;
 		if (await this.messageDeduplicator.dedupe(dedupeKey, params.user.userId, params.eventId, msg2.text || "")) {
@@ -648,6 +657,28 @@ export class App {
 			return;
 		}
 		await chan.sendReaction(eventId, e.key);
+	}
+
+	public async handleMatrixRemoveReaction(
+		room: IRemoteRoom,
+		eventId: string,
+		reaction: string,
+		asUser: ISendingUser | null,
+	) {
+		const p = this.puppets[room.puppetId];
+		if (!p || asUser) {
+			return;
+		}
+		const chan = p.client.getChannel(room.roomId);
+		if (!chan) {
+			log.warn(`Room ${room.roomId} not found!`);
+			return;
+		}
+		const e = Emoji.find(reaction);
+		if (!e) {
+			return;
+		}
+		await chan.removeReaction(eventId, e.key);
 	}
 
 	public async handleMatrixImage(
