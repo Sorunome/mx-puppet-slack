@@ -97,7 +97,7 @@ export class App {
 		return {
 			puppetId,
 			roomId: chan.fullId,
-			nameVars,
+			nameVars: chan.type === "mpim" ? undefined : nameVars,
 			avatarUrl: chan.team.iconUrl,
 			topic: chan.topic,
 			isDirect: false,
@@ -376,7 +376,7 @@ export class App {
 			const res = await this.slackMessageParser.FormatMessage(parserOpts, {
 				text: msg.text || "",
 				blocks: msg.blocks || undefined,
-				attachments: msg.attachments || undefined
+				attachments: msg.attachments || undefined,
 			});
 			const opts = {
 				body: res.body,
