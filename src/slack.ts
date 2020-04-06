@@ -481,7 +481,8 @@ export class App {
 
 		if (msg.text.match(/^\/[0-9a-zA-Z]+/)) {
 			const [command, parameters] = msg.text.split(/ (.+)/);
-			chan.sendCommand(command, parameters)
+			const eventId = await chan.sendCommand(command, parameters);
+			await this.puppet.eventSync.insert(room.puppetId, data.eventId!, eventId);
 
 			return;
 		}
