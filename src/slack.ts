@@ -479,7 +479,7 @@ export class App {
 			event.content,
 		);
 
-		if (msg.text.startsWith("/")) {
+		if (msg.text.match(/^\/[0-9a-zA-Z]+/)) {
 			const [command, parameters] = msg.text.split(/ (.+)/);
 			chan.sendCommand(command, parameters)
 
