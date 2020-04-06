@@ -480,15 +480,8 @@ export class App {
 		);
 
 		if (msg.text.startsWith("/")) {
-			let fullCommand = msg.text;
-			let commandParametersSplitPoint = fullCommand.indexOf(" ");
-			if (commandParametersSplitPoint < 0) {
-				chan.sendCommand(fullCommand, undefined)
-			} else {
-				let command = fullCommand.substr(0, commandParametersSplitPoint);
-				let parameters = fullCommand.substr(commandParametersSplitPoint + 1);
-				chan.sendCommand(command, parameters)
-			}
+			const [command, parameters] = msg.text.split(/ (.+)/);
+			chan.sendCommand(command, parameters)
 
 			return;
 		}
