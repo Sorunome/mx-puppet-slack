@@ -37,10 +37,17 @@ export class Schema implements IDbSchema {
 						log.verbose("No alias found, ignoring", err.error || err.body || err);
 					}
 					// let's update the db
-					await store.db.Run("UPDATE chan_store SET room_id = $rid WHERE mxid = $mxid", {
-						rid: newRoomId,
-						mxid: room.mxid,
-					});
+					try {
+						await store.db.Run("UPDATE chan_store SET room_id = $rid WHERE mxid = $mxid", {
+							rid: newRoomId,
+							mxid: room.mxid,
+						});
+					} catch (err) {
+						await store.db.Run("UPDATE room_store SET room_id = $rid WHERE mxid = $mxid", {
+							rid: newRoomId,
+							mxid: room.mxid,
+						});
+					}
 					// let's try to give OP
 					try {
 						const oldUserId = await opClient.getUserId();
