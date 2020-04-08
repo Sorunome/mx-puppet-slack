@@ -18,7 +18,7 @@
     "events": "^3.1.0",
     "js-yaml": "^3.13.1",
     "matrix-slack-parser": "0.0.5",
-    "mx-puppet-bridge": "0.0.37-3",
+    "mx-puppet-bridge": "0.0.38",
     "node-emoji": "^1.10.0",
     "soru-slack-client": "0.0.12",
     "tslint": "^5.20.1",
