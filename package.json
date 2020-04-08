@@ -15,17 +15,17 @@
     "command-line-args": "^5.1.1",
     "command-line-usage": "^5.0.5",
     "escape-html": "^1.0.3",
-    "events": "^3.0.0",
+    "events": "^3.1.0",
     "js-yaml": "^3.13.1",
-    "matrix-slack-parser": "0.0.2",
-    "mx-puppet-bridge": "0.0.37",
+    "matrix-slack-parser": "0.0.3",
+    "mx-puppet-bridge": "0.0.37-3",
     "node-emoji": "^1.10.0",
-    "soru-slack-client": "0.0.11",
-    "tslint": "^5.17.0",
-    "typescript": "^3.7.4",
+    "soru-slack-client": "0.0.12",
+    "tslint": "^5.20.1",
+    "typescript": "^3.8.3",
     "useragent-generator": "^1.1.1-amkt-22079-finish.0"
   },
   "devDependencies": {
-    "@types/node": "^12.0.8"
+    "@types/node": "^12.12.34"
   }
 }
