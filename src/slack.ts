@@ -478,6 +478,15 @@ export class App {
 			this.getMatrixMessageParserOpts(room.puppetId),
 			event.content,
 		);
+
+		if (msg.text.match(/^\/[0-9a-zA-Z]+/)) {
+			const [command, parameters] = msg.text.split(/ (.+)/);
+			const eventId = await chan.sendCommand(command, parameters);
+			await this.puppet.eventSync.insert(room.puppetId, data.eventId!, eventId);
+
+			return;
+		}
+
 		if (asUser) {
 			if (data.emote) {
 				msg.text = `_${msg.text}_`;
