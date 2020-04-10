@@ -24,6 +24,7 @@ Also check the config for other values, like your homeserver domain.
     git clone https://github.com/Sorunome/mx-puppet-slack.git
     cd mx-puppet-slack
     npm install
+    ```
 *   Edit the configuration file and generate the registration file:
     ```
     cp sample.config.yaml config.yaml
@@ -74,3 +75,12 @@ After that, run:
 ```
 link <token> <d cookie contents>
 ```
+
+## Relay
+It is also possible to use mx-puppet-slack as a relay. For that, the events API needs to be configured. in `slack.path` you can configure the base-path for the various new endpoints. By default this is `/_matrix/slack/client`.
+
+The events API will have appended `/events`, so by default `/_matrix/slack/client/events`.
+
+The new oauth endpoint to add the slack bot to new teams has `/oauth/{appId}` appended, so by default `/_matrix/slack/client/events/{appId}`.
+
+Create your slack app, give it the permissions and then link it with `link <appId> <clientId> <clientSecret> <signingSecret>`. Don't forget to `settype <puppetId> relay`!
