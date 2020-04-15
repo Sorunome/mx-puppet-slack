@@ -1,7 +1,7 @@
 bridge:
   # Port to host the bridge on
   # Used for communication between the homeserver and the bridge
-  port: 8434
+  port: 8432
   # The host connections to the bridge's webserver are allowed from
   bindAddress: localhost
   # Public domain of the homeserver
