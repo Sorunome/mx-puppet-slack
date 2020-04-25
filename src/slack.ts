@@ -482,7 +482,7 @@ export class App {
 		if (msg.text.match(/^\/[0-9a-zA-Z]+/)) {
 			const [command, parameters] = msg.text.split(/ (.+)/);
 			const eventId = await chan.sendCommand(command, parameters);
-			await this.puppet.eventSync.insert(room.puppetId, data.eventId!, eventId);
+			await this.puppet.eventSync.insert(room, data.eventId!, eventId);
 
 			return;
 		}
@@ -515,7 +515,7 @@ export class App {
 		}
 		this.messageDeduplicator.unlock(dedupeKey, p.data.self.id, eventId);
 		if (eventId) {
-			await this.puppet.eventSync.insert(room.puppetId, data.eventId!, eventId);
+			await this.puppet.eventSync.insert(room, data.eventId!, eventId);
 		}
 	}
 
@@ -565,7 +565,7 @@ export class App {
 		}
 		this.messageDeduplicator.unlock(dedupeKey, p.data.self.id, newEventId);
 		if (newEventId) {
-			await this.puppet.eventSync.insert(room.puppetId, data.eventId!, newEventId);
+			await this.puppet.eventSync.insert(room, data.eventId!, newEventId);
 		}
 	}
 
@@ -624,7 +624,7 @@ export class App {
 		this.messageDeduplicator.unlock(dedupeKey, p.data.self.id, newEventId);
 		if (newEventId) {
 			this.tsThreads[newEventId] = tsThread;
-			await this.puppet.eventSync.insert(room.puppetId, data.eventId!, newEventId);
+			await this.puppet.eventSync.insert(room, data.eventId!, newEventId);
 		}
 	}
 
@@ -744,7 +744,7 @@ export class App {
 			});
 		}
 		if (eventId) {
-			await this.puppet.eventSync.insert(room.puppetId, data.eventId!, eventId);
+			await this.puppet.eventSync.insert(room, data.eventId!, eventId);
 		}
 	}
 
@@ -781,7 +781,7 @@ export class App {
 		}
 		this.messageDeduplicator.unlock(dedupeKey, p.data.self.id, eventId);
 		if (eventId) {
-			await this.puppet.eventSync.insert(room.puppetId, data.eventId!, eventId);
+			await this.puppet.eventSync.insert(room, data.eventId!, eventId);
 		}
 	}
 
