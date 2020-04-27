@@ -386,6 +386,7 @@ export class App {
 			if (msg.threadTs) {
 				const replyTs = this.threadSendTs[msg.threadTs] || msg.threadTs;
 				this.threadSendTs[msg.threadTs] = msg.ts;
+				this.tsThreads[msg.ts] = msg.threadTs
 				await this.puppet.sendReply(params, replyTs, opts);
 			} else {
 				await this.puppet.sendMessage(params, opts);
