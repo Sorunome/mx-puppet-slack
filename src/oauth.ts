@@ -65,7 +65,8 @@ export const getDataFromStrHook = async (str: string): Promise<IRetData> => {
 			retData.error = "Please specify the `d` cookie for `xoxc` tokens!";
 			return retData;
 		}
-		cookie = parts[1];
+		// first decode and then encode, in case the user input was already encoded
+		cookie = encodeURIComponent(decodeURIComponent(parts[1]));
 	}
 	if (token.startsWith("xox")) {
 		retData.success = true;
