@@ -160,6 +160,11 @@ async function run() {
 	});
 	await puppet.start();
 	puppet.AS.expressAppInstance.get(config.oauth.redirectPath, oauthCallback);
+
+	process.on('SIGINT', function () {
+		puppet.AS.stop()
+		process.exit(1)
+	})
 }
 
 // tslint:disable-next-line:no-floating-promises
