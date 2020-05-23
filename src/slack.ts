@@ -370,6 +370,16 @@ export class App {
 		const parserOpts = this.getSlackMessageParserOpts(puppetId, msg.channel.team);
 		log.verbose("Received message.");
 		const dedupeKey = `${puppetId};${params.room.roomId}`;
+
+		// Process thread replies before deduplication to ensure
+		// messages sent by yourself get proper threading
+		let replyTs: string | undefined = undefined
+		if (msg.threadTs) {
+			replyTs = await this.store.threadStore.getLastThreadEvent(msg.threadTs) || msg.threadTs;
+			await this.store.threadStore.setLastThreadEvent(msg.threadTs, msg.ts)
+			await this.store.threadStore.setFirstThreadEvent(msg.ts, msg.threadTs)
+		}
+
 		if (!(msg.empty && !msg.attachments) &&
 			!await this.messageDeduplicator.dedupe(dedupeKey, params.user.userId, params.eventId, msg.text || "")) {
 			const res = await this.slackMessageParser.FormatMessage(parserOpts, {
@@ -382,10 +392,8 @@ export class App {
 				formattedBody: res.formatted_body,
 				emote: msg.meMessage,
 			};
-			if (msg.threadTs) {
-				const replyTs = await this.store.threadStore.getLastThreadEvent(msg.threadTs) || msg.threadTs;
-				await this.store.threadStore.setLastThreadEvent(msg.threadTs, msg.ts)
-				await this.store.threadStore.setFirstThreadEvent(msg.ts, msg.threadTs)
+
+			if (replyTs) {
 				await this.puppet.sendReply(params, replyTs, opts);
 			} else {
 				await this.puppet.sendMessage(params, opts);
