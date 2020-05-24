@@ -1,17 +1,26 @@
 import { Store } from "mx-puppet-bridge";
 import { IStoreToken } from "soru-slack-client";
+import {DbThreadStore} from "./db/DbThreadStore";
 
-const CURRENT_SCHEMA = 1;
+const CURRENT_SCHEMA = 2;
 
 export class SlackStore {
 	constructor(
 		private store: Store,
 	) { }
 
+	private pThreadStore: DbThreadStore
+
+	get threadStore(): DbThreadStore {
+		return this.pThreadStore;
+	}
+
 	public async init(): Promise<void> {
 		await this.store.init(CURRENT_SCHEMA, "slack_schema", (version: number) => {
 			return require(`./db/schema/v${version}.js`).Schema;
 		}, false);
+
+		this.pThreadStore = new DbThreadStore(this.store.db)
 	}
 
 	public async getTokens(puppetId: number): Promise<IStoreToken[]> {

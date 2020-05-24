@@ -37,13 +37,12 @@ interface ISlackPuppets {
 
 export class App {
 	private puppets: ISlackPuppets = {};
-	private tsThreads: {[ts: string]: string} = {};
-	private threadSendTs: {[ts: string]: string} = {};
 	private slackMessageParser: SlackMessageParser;
 	private matrixMessageParser: MatrixMessageParser;
 	private messageDeduplicator: MessageDeduplicator;
 	private provisioningAPI: SlackProvisioningAPI;
 	private store: SlackStore;
+
 	constructor(
 		private puppet: PuppetBridge,
 	) {
@@ -384,9 +383,9 @@ export class App {
 				emote: msg.meMessage,
 			};
 			if (msg.threadTs) {
-				const replyTs = this.threadSendTs[msg.threadTs] || msg.threadTs;
-				this.threadSendTs[msg.threadTs] = msg.ts;
-				this.tsThreads[msg.ts] = msg.threadTs
+				const replyTs = await this.store.threadStore.getLastThreadEvent(msg.threadTs) || msg.threadTs;
+				await this.store.threadStore.setLastThreadEvent(msg.threadTs, msg.ts)
+				await this.store.threadStore.setFirstThreadEvent(msg.ts, msg.threadTs)
 				await this.puppet.sendReply(params, replyTs, opts);
 			} else {
 				await this.puppet.sendMessage(params, opts);
@@ -461,6 +460,9 @@ export class App {
 				return;
 			}
 		}
+
+		await this.store.threadStore.remove(msg.ts);
+
 		const params = await this.getSendParams(puppetId, msg);
 		await this.puppet.sendRedact(params, msg.ts);
 	}
@@ -587,10 +589,9 @@ export class App {
 			log.warn(`Room ${room.roomId} not found!`);
 			return;
 		}
-		let tsThread = eventId;
-		while (this.tsThreads[tsThread]) {
-			tsThread = this.tsThreads[tsThread];
-		}
+
+
+		let tsThread = await this.store.threadStore.getFirstThreadEvent(eventId) ?? eventId;
 		log.verbose(`Determined thread ts=${tsThread}`);
 		const msg = await this.matrixMessageParser.FormatMessage(
 			this.getMatrixMessageParserOpts(room.puppetId),
@@ -624,7 +625,9 @@ export class App {
 		}
 		this.messageDeduplicator.unlock(dedupeKey, p.data.self.id, newEventId);
 		if (newEventId) {
-			this.tsThreads[newEventId] = tsThread;
+			await this.store.threadStore.setFirstThreadEvent(newEventId, tsThread);
+			await this.store.threadStore.setLastThreadEvent(tsThread, newEventId)
+
 			await this.puppet.eventSync.insert(room, data.eventId!, newEventId);
 		}
 	}
@@ -650,6 +653,8 @@ export class App {
 				asUser: true,
 			});
 		}
+
+		await this.store.threadStore.remove(eventId);
 	}
 
 	public async handleMatrixReaction(room: IRemoteRoom, eventId: string, reaction: string, asUser: ISendingUser | null) {
