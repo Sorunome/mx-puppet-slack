@@ -17,7 +17,7 @@
     "escape-html": "^1.0.3",
     "events": "^3.1.0",
     "js-yaml": "^3.13.1",
-    "matrix-slack-parser": "0.0.6",
+    "matrix-slack-parser": "0.1.0",
     "mx-puppet-bridge": "0.0.43-6",
     "node-emoji": "^1.10.0",
     "soru-slack-client": "0.0.17",
