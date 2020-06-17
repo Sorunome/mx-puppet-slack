@@ -888,6 +888,25 @@ export class App {
 		return reply;
 	}
 
+	public async listGroups(puppetId: number): Promise<IRetList[]> {
+		const p = this.puppets[puppetId];
+		if (!p) {
+			return [];
+		}
+		const reply: IRetList[] = [];
+		for (const [, team] of p.client.teams) {
+			if (team.partial) {
+				await team.load();
+			}
+			reply.push({
+				category: true,
+				name: team.name,
+				id: team.id
+			});
+		}
+		return reply;
+	}
+
 	public async getUserIdsInRoom(room: IRemoteRoom): Promise<Set<string> | null> {
 		const p = this.puppets[room.puppetId];
 		if (!p) {
