@@ -899,7 +899,6 @@ export class App {
 				await team.load();
 			}
 			reply.push({
-				category: true,
 				name: team.name,
 				id: team.id
 			});
