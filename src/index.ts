@@ -143,6 +143,7 @@ async function run() {
 	puppet.setGetDmRoomIdHook(slack.getDmRoom.bind(slack));
 	puppet.setListUsersHook(slack.listUsers.bind(slack));
 	puppet.setListRoomsHook(slack.listRooms.bind(slack));
+	puppet.setListGroupsHook(slack.listGroups.bind(slack));
 	puppet.setGetUserIdsInRoomHook(slack.getUserIdsInRoom.bind(slack));
 	puppet.setGetDescHook(async (puppetId: number, data: any): Promise<string> => {
 		let s = "Slack";
