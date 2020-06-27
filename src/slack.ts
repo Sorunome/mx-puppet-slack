@@ -386,7 +386,7 @@ export class App {
 			if (msg.threadTs) {
 				const replyTs = this.threadSendTs[msg.threadTs] || msg.threadTs;
 				this.threadSendTs[msg.threadTs] = msg.ts;
-				this.tsThreads[msg.ts] = msg.threadTs
+				this.tsThreads[msg.ts] = msg.threadTs;
 				await this.puppet.sendReply(params, replyTs, opts);
 			} else {
 				await this.puppet.sendMessage(params, opts);
@@ -482,8 +482,8 @@ export class App {
 
 		if (msg.text.match(/^\/[0-9a-zA-Z]+/)) {
 			const [command, parameters] = msg.text.split(/ (.+)/);
-			const eventId = await chan.sendCommand(command, parameters);
-			await this.puppet.eventSync.insert(room, data.eventId!, eventId);
+			const retEventId = await chan.sendCommand(command, parameters);
+			await this.puppet.eventSync.insert(room, data.eventId!, retEventId);
 
 			return;
 		}
@@ -900,7 +900,7 @@ export class App {
 			}
 			reply.push({
 				name: team.name,
-				id: team.id
+				id: team.id,
 			});
 		}
 		return reply;
