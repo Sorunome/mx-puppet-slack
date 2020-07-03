@@ -998,7 +998,7 @@ export class App {
 						return null;
 					}
 					const message = await this.puppet.eventSync.getMatrix(room, messageId);
-					if (!message) {
+					if (message.length === 0) {
 						log.debug(`Didn't find Matrix event ID for ${room.roomId}/${messageId}`)
 						return null;
 					}
