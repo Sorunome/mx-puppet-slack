@@ -980,18 +980,31 @@ export class App {
 					};
 				},
 				getMessage: async (teamDomain: string, channelId: string, messageId: string) => {
+					const origPuppet = await this.puppet.provisioner.get(puppetId);
+					if (!origPuppet) {
+						log.warn(`Provisioner didn't return anything for puppetId given to getSlackMessageParserOpts`);
+						return null;
+					}
+					let foundPuppetId: number | null = null;
 					let foundTeam: Slack.Team | null = null;
-					for (const clientTeam of client.teams.values()) {
-						if (clientTeam.domain === teamDomain) {
-							foundTeam = clientTeam;
-							break;
+					for (const [iterPuppetId, puppet] of Object.entries(this.puppets)) {
+						const puppetData = await this.puppet.provisioner.get(+iterPuppetId);
+						if (!puppetData || (puppetData.puppetMxid !== origPuppet.puppetMxid && !puppetData.isPublic)) {
+							continue;
+						}
+						for (const clientTeam of puppet.client.teams.values()) {
+							if (clientTeam.domain === teamDomain) {
+								foundTeam = clientTeam;
+								foundPuppetId = +iterPuppetId;
+								break;
+							}
 						}
 					}
-					if (!team) {
+					if (!foundTeam || !foundPuppetId) {
 						log.debug(`Didn't find team ${teamDomain} to get message ${channelId}/${messageId}`);
 						return null;
 					}
-					const room = {puppetId, roomId: `${team.id}-${channelId}`};
+					const room = {puppetId: foundPuppetId, roomId: `${foundTeam.id}-${channelId}`};
 					const roomId = await this.puppet.roomSync.maybeGetMxid(room);
 					if (!roomId) {
 						log.debug(`Didn't find Matrix room ID for ${room.roomId} to get message ${messageId}`);
