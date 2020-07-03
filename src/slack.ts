@@ -979,6 +979,34 @@ export class App {
 						name: "#" + chan.name,
 					};
 				},
+				getMessage: async (teamDomain: string, channelId: string, messageId: string) => {
+					let foundTeam: Slack.Team | null = null;
+					for (const team of client.teams.values()) {
+						if (team.domain === teamDomain) {
+							foundTeam = team;
+							break;
+						}
+					}
+					if (!team) {
+						log.debug(`Didn't find team ${teamDomain} to get message ${channelId}/${messageId}`)
+						return null;
+					}
+					const room = {puppetId, roomId: `${team.id}-${channelId}`};
+					const roomId = await this.puppet.roomSync.maybeGetMxid(room);
+					if (!roomId) {
+						log.debug(`Didn't find Matrix room ID for ${room.roomId} to get message ${messageId}`)
+						return null;
+					}
+					const message = await this.puppet.eventSync.getMatrix(room, messageId);
+					if (!message) {
+						log.debug(`Didn't find Matrix event ID for ${room.roomId}/${messageId}`)
+						return null;
+					}
+					return {
+						mxid: message[0],
+						roomId,
+					};
+				},
 				getUsergroup: async (id: string, name: string) => null,
 				getTeam: async (id: string, name: string) => null,
 				urlToMxc: async (url: string) => {
