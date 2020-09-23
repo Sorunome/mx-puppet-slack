@@ -17,10 +17,10 @@
     "escape-html": "^1.0.3",
     "events": "^3.1.0",
     "js-yaml": "^3.13.1",
-    "matrix-slack-parser": "^0.1.1",
-    "mx-puppet-bridge": "0.0.45",
+    "matrix-slack-parser": "^0.1.2",
+    "mx-puppet-bridge": "0.0.45-4",
     "node-emoji": "^1.10.0",
-    "soru-slack-client": "0.0.17",
+    "soru-slack-client": "0.1.0",
     "tslint": "^5.20.1",
     "typescript": "^3.8.3",
     "useragent-generator": "^1.1.1-amkt-22079-finish.0"
