@@ -1,6 +1,18 @@
-FROM node:latest AS builder
+FROM node:alpine AS builder
 
 WORKDIR /opt/mx-puppet-slack
+
+RUN apk --no-cache add git python make g++ pkgconfig \
+    build-base \
+    cairo-dev \
+    jpeg-dev \
+    pango-dev \
+    musl-dev \
+    giflib-dev \
+    pixman-dev \
+    pangomm-dev \
+    libjpeg-turbo-dev \
+    freetype-dev
 
 # run build process as user in case of npm pre hooks
 # pre hooks are not executed while running as root
@@ -22,8 +34,16 @@ VOLUME /data
 ENV CONFIG_PATH=/data/config.yaml \
     REGISTRATION_PATH=/data/slack-registration.yaml
 
-# su-exec is used by docker-run.sh to drop privileges
-RUN apk add --no-cache su-exec
+RUN apk add --no-cache su-exec \
+    cairo \
+    jpeg \
+    pango \
+    musl \
+    giflib \
+    pixman \
+    pangomm \
+    libjpeg-turbo \
+    freetype
 
 WORKDIR /opt/mx-puppet-slack
 COPY docker-run.sh ./
