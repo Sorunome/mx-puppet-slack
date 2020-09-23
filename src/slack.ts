@@ -475,6 +475,20 @@ export class App {
 			log.warn(`Room ${room.roomId} not found!`);
 			return;
 		}
+		if (asUser) {
+			if (!event.content.formatted_body) {
+				event.content.formatted_body = escapeHtml(event.content.body);
+			}
+			if (data.emote) {
+				event.content.formatted_body = `<em>${event.content.formatted_body}</em>`;
+			}
+			data.emote = false;
+			// add the fallback
+			if (!p.data.appId) {
+				event.content.formatted_body =
+					`<strong>${escapeHtml(asUser.displayname)}</strong>: ${event.content.formatted_body}`;
+			}
+		}
 		const msg = await this.matrixMessageParser.FormatMessage(
 			this.getMatrixMessageParserOpts(room.puppetId),
 			event.content,
@@ -488,16 +502,6 @@ export class App {
 			return;
 		}
 
-		if (asUser) {
-			if (data.emote) {
-				msg.text = `_${msg.text}_`;
-			}
-			data.emote = false;
-			// add the fallback
-			if (!p.data.appId) {
-				msg.text = `*${asUser.displayname}*: ${msg.text}`;
-			}
-		}
 		const dedupeKey = `${room.puppetId};${room.roomId}`;
 		this.messageDeduplicator.lock(dedupeKey, p.data.self.id, msg.text);
 		let eventId = "";

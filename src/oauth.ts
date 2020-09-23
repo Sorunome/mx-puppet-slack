@@ -34,6 +34,10 @@ export const convertOAuthToken = async (code: string, redirectUri?: string): Pro
 };
 
 export const oauthCallback = async (req: Request, res: Response) => {
+	if (typeof req.query.code !== "string") {
+		res.status(forbidden).send(getHtmlResponse("Failed to get OAuth token", "not a string"));
+		return;
+	}
 	const oauthData = await convertOAuthToken(req.query.code);
 	if (oauthData.ok) {
 		res.send(getHtmlResponse(
