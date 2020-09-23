@@ -1,3 +1,6 @@
+# For more generic bridge configuration options have a look at
+# https://github.com/Sorunome/mx-puppet-bridge/blob/master/sample.config.yaml
+
 bridge:
   # Port to host the bridge on
   # Used for communication between the homeserver and the bridge
