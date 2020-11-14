@@ -90,3 +90,28 @@ logging:
       # number of bytes, or units of kb, mb, and gb. If using the units, add
       # 'k', 'm', or 'g' as the suffix
       maxSize: 50m
+
+namePatterns:
+  # The default displayname for a bridged user
+  #
+  # Available variables:
+  #
+  # name: username of the user
+  # team: name of the team
+  user: :name
+
+  # Name of bridged Slack channels
+  #
+  # Available variables:
+  #
+  # name: name of the channel
+  # team: name of the team
+  # type: type of the room
+  room: :name[:team? - :team,]
+
+  # Names of bridged Slack groups
+  #
+  # Available variables:
+  #
+  # name: name of the group
+  group: :name
