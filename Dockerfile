@@ -16,7 +16,7 @@ RUN apk --no-cache add git python make g++ pkgconfig \
 
 # run build process as user in case of npm pre hooks
 # pre hooks are not executed while running as root
-RUN chown node:node /opt/mx-puppet-slack
+RUN chown -R node:node /opt/mx-puppet-slack
 USER node
 
 COPY package.json package-lock.json ./
