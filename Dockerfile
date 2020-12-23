@@ -19,11 +19,11 @@ RUN apk --no-cache add git python make g++ pkgconfig \
 RUN chown -R node:node /opt/mx-puppet-slack
 USER node
 
-COPY package.json package-lock.json ./
+COPY --chown=node:node package.json package-lock.json ./
 RUN npm install
 
-COPY tsconfig.json ./
-COPY src/ ./src/
+COPY --chown=node:node tsconfig.json ./
+COPY --chown=node:node src/ ./src/
 RUN npm run build
 
 
