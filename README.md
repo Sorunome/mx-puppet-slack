@@ -67,15 +67,9 @@ create a new Slack app.
 1. Add your redirect URL.
 1. Fill in the `oauth` block in your `config.yaml` file. Be sure to forward the `oauth.redirectUri` to the bridge.
 1. Start a chat with the bot user (`@_slackpuppet_bot:domain.tld` unless you changed the config)
-1. Tell the bot:
-```
-link
-```
+1. Tell the bot: `link`
 1. Click the link it gives you allow the access
-1. Copy the token given and send the bot that token with
-```
-link TOKEN_YOU_COPIED
-```
+1. Copy the token given and send the bot that token with: `link TOKEN_YOU_COPIED`
 
 ### Option 3. xoxc token
 **Warning**: Linking your `xoxc` account's token is against Slack's Terms of Service.
