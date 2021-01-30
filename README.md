@@ -52,19 +52,32 @@ Also check the config for other values, like your homeserver domain.
 
 ## How to get Slack app credentials
 
-### Legacy Token
+### Option 1. Legacy Token
 Get a legacy token from https://api.slack.com/custom-integrations/legacy-tokens and then chat with the bot user (`@_slackpuppet_bot:domain.tld` unless you changed the config):
 ```
 link <token>
 ```
 
-### OAuth
-To use OAuth set up a slack app and fill in `oauth` block in your config. Be sure to forward the `oauth.redirectUri` to the bridge. Then just run:
+### Option 2. OAuth
+To use OAuth
+1. Set up a Slack app at https://api.slack.com/apps. You do not need to setup any
+of the additional features or functionality that Slack prompts you to enable when you 
+create a new Slack app.
+1. Go to the "OAuth & Permissions" tab in the sidebar
+1. Add your redirect URL.
+1. Fill in the `oauth` block in your `config.yaml` file. Be sure to forward the `oauth.redirectUri` to the bridge.
+1. Start a chat with the bot user (`@_slackpuppet_bot:domain.tld` unless you changed the config)
+1. Tell the bot:
 ```
 link
 ```
+1. Click the link it gives you allow the access
+1. Copy the token given and send the bot that token with
+```
+link TOKEN_YOU_COPIED
+```
 
-### xoxc token
+### Option 3. xoxc token
 **Warning**: Linking your `xoxc` account's token is against Slack's Terms of Service.
 
 First you must retrieve your `xoxc` token: In the network manager, filter for type WS/WebSocket, and the `xoxc` token is there as URL parameter of that request.
