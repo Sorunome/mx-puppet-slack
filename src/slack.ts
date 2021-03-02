@@ -309,19 +309,13 @@ export class App {
 		client.on("reactionAdded", async (reaction: Slack.Reaction) => {
 			log.verbose("Received new reaction");
 			const params = await this.getSendParams(puppetId, reaction.message);
-			const e = Emoji.get(reaction.reaction);
-			if (!e) {
-				return;
-			}
+			const e = this.slackToEmoji(`:${reaction.reaction}:`);
 			await this.puppet.sendReaction(params, reaction.message.ts, e);
 		});
 		client.on("reactionRemoved", async (reaction: Slack.Reaction) => {
 			log.verbose("Received reaction remove");
 			const params = await this.getSendParams(puppetId, reaction.message);
-			const e = Emoji.get(reaction.reaction);
-			if (!e) {
-				return;
-			}
+			const e = this.slackToEmoji(`:${reaction.reaction}:`);
 			await this.puppet.removeReaction(params, reaction.message.ts, e);
 		});
 		p.client = client;
@@ -667,11 +661,8 @@ export class App {
 			log.warn(`Room ${room.roomId} not found!`);
 			return;
 		}
-		const e = Emoji.find(reaction);
-		if (!e) {
-			return;
-		}
-		await chan.sendReaction(eventId, e.key);
+		const e = this.emojiToSlack(reaction).slice(1, -1);
+		await chan.sendReaction(eventId, e);
 	}
 
 	public async handleMatrixRemoveReaction(
@@ -689,11 +680,8 @@ export class App {
 			log.warn(`Room ${room.roomId} not found!`);
 			return;
 		}
-		const e = Emoji.find(reaction);
-		if (!e) {
-			return;
-		}
-		await chan.removeReaction(eventId, e.key);
+		const e = this.emojiToSlack(reaction).slice(1, -1);
+		await chan.removeReaction(eventId, e);
 	}
 
 	public async handleMatrixImage(
@@ -1077,5 +1065,25 @@ export class App {
 				},
 			},
 		};
+	}
+
+	private emojiToSlack(msg: string): string {
+		return msg.replace(/((?:\u00a9|\u00ae|[\u2000-\u3300]|\ud83c[\ud000-\udfff]|\ud83d[\ud000-\udfff]|\ud83e[\ud000-\udfff])[\ufe00-\ufe0f]?)/gi, (s) => {
+			const e = Emoji.find(s);
+			if (e) {
+				return `:${e.key}:`;
+			}
+			return "";
+		});
+	}
+
+	private slackToEmoji(msg: string): string {
+		return msg.replace(/:([^\s:]+?):/gi, (s) => {
+			const e = Emoji.get(s);
+			if (Emoji.find(e + "\ufe0f")) {
+				return e + "\ufe0f";
+			}
+			return e;
+		});
 	}
 }
