@@ -12,7 +12,7 @@ bridge:
   # Reachable URL of the Matrix homeserver
   homeserverUrl: https://matrix.org
 
-# Slack OAuth settings. Create a slack app at https://api.slack.com/apps
+# Slack OAuth settings. See README.md for info on how to configure.
 oauth:
   enabled: false
   # Slack app credentials.
