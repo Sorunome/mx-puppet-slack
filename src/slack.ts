@@ -12,6 +12,7 @@ import {
 	IStringFormatterVars,
 	MessageDeduplicator,
 	ISendingUser,
+	IPresenceEvent,
 } from "mx-puppet-bridge";
 import {
 	SlackMessageParser, ISlackMessageParserOpts, MatrixMessageParser, IMatrixMessageParserOpts,
@@ -787,6 +788,46 @@ export class App {
 		this.messageDeduplicator.unlock(dedupeKey, p.data.self.id, eventId);
 		if (eventId) {
 			await this.puppet.eventSync.insert(room, data.eventId!, eventId);
+		}
+	}
+
+	public async handleMatrixPresence(
+		puppetId: number,
+		presence: IPresenceEvent,
+		asUser: ISendingUser | null,
+		event: any,
+	) {
+		const p = this.puppets[puppetId];
+		if (!p || asUser) {
+			return;
+		}
+		if (presence.statusMsg) {
+			await p.client.setStatus(presence.statusMsg);
+		}
+		await p.client.setPresence({
+			online: "auto",
+			offline: "away",
+			unavailable: "away",
+		}[presence.presence] as "auto" | "away");
+	}
+
+	public async handleMatrixTyping(
+		room: IRemoteRoom,
+		typing: boolean,
+		asUser: ISendingUser | null,
+		event: any,
+	) {
+		const p = this.puppets[room.puppetId];
+		if (!p || asUser) {
+			return;
+		}
+		const chan = p.client.getChannel(room.roomId);
+		if (!chan) {
+			log.warn(`Room ${room.roomId} not found!`);
+			return;
+		}
+		if (typing) {
+			await chan.sendTyping();
 		}
 	}
 
