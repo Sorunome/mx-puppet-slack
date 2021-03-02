@@ -64,6 +64,18 @@ To use OAuth set up a slack app and fill in `oauth` block in your config. Be sur
 link
 ```
 
+### xoxs token
+**Warning:**: Linking your `xoxs` account's token is against Slack's Terms of Service.
+
+First you must retrieve your `xoxs` token: Go to your slack customization page, e.g. https://my.slack.com/customize, and then open the debugging console
+(F12 or rightclick --> inspect element).
+Get the token by entering `TS.boot_data.api_token`.
+
+After that, run:
+```
+link <token>
+```
+
 ### xoxc token
 **Warning**: Linking your `xoxc` account's token is against Slack's Terms of Service.
 
