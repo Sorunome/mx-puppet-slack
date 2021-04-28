@@ -1,8 +1,8 @@
-FROM node:alpine AS builder
+FROM node:15.0-alpine3.12 AS builder
 
 WORKDIR /opt/mx-puppet-slack
 
-RUN apk --no-cache add git python make g++ pkgconfig \
+RUN apk --no-cache add git python2 make g++ pkgconfig \
     build-base \
     cairo-dev \
     jpeg-dev \
@@ -27,7 +27,7 @@ COPY --chown=node:node src/ ./src/
 RUN npm run build
 
 
-FROM node:alpine
+FROM node:15.0-alpine3.12
 
 VOLUME /data
 
