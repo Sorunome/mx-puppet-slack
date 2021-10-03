@@ -52,6 +52,16 @@ Also check the config for other values, like your homeserver domain.
 
 ## How to get Slack app credentials
 
+The bridge can authenticate with Slack in two ways:
+1. using the officially supported bot/app tokens
+   - Pros: officially supported by Slack, nice UX if used in relay mode
+   - Cons: You need access permissions to add the app to the Slack workspace and in case of OAuth also to the bridge config.yaml file
+2. using your user token
+   - Pros: don't need any permissions or access
+   - Cons: against Slack's Terms of Service, can look confusing in relay mode
+
+Which one you should choose depends on your situation.
+
 ### Option 1. Legacy Token
 Get a legacy token from https://api.slack.com/custom-integrations/legacy-tokens and then chat with the bot user (`@_slackpuppet_bot:domain.tld` unless you changed the config):
 ```
@@ -97,7 +107,7 @@ link <token> <d cookie contents>
 ```
 
 ## Relay
-It is also possible to use mx-puppet-slack as a relay. For that, the events API needs to be configured. in `slack.path` you can configure the base-path for the various new endpoints. By default this is `/_matrix/slack/client`.
+It is also possible to use mx-puppet-slack as a relay. For that, the events API needs to be configured. In `slack.path` you can configure the base-path for the various new endpoints. By default this is `/_matrix/slack/client`.
 
 The events API will have appended `/events`, so by default `/_matrix/slack/client/events`.
 
