@@ -54,11 +54,11 @@ Also check the config for other values, like your homeserver domain.
 
 The bridge can authenticate with Slack in two ways:
 1. using the officially supported bot/app tokens
- - Pros: officially supported by Slack, nice UX if used in relay mode
- - Cons: You need access permissions to add the app to the Slack workspace and in case of OAuth also to the bridge config.yaml file
+   - Pros: officially supported by Slack, nice UX if used in relay mode
+   - Cons: You need access permissions to add the app to the Slack workspace and in case of OAuth also to the bridge config.yaml file
 2. using your user token
- - Pros: don't need any permissions or access
- - Cons: against Slack's Terms of Service, can look confusing in relay mode
+   - Pros: don't need any permissions or access
+   - Cons: against Slack's Terms of Service, can look confusing in relay mode
 
 Which one you should choose depends on your situation.
 
