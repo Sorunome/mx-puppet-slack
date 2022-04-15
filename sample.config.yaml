@@ -115,3 +115,9 @@ namePatterns:
   #
   # name: name of the group
   group: :name
+
+slack:
+  # Defines behavior of @room broadcast
+  # Allowed values:
+  # channel, here, everyone
+  roomBroadcast: "here"

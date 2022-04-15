@@ -23,4 +23,5 @@ class OAuthConfig {
 
 class SlackConfig {
 	public path: string = "/_matrix/slack/client";
+	public roomBroadcast: "channel" | "here" | "everyone"	= "channel";
 }

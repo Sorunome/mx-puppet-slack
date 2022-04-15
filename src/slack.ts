@@ -961,6 +961,7 @@ export class App {
 	private getMatrixMessageParserOpts(puppetId: number): IMatrixMessageParserOpts {
 		const client = this.puppets[puppetId].client;
 		return {
+			roomBroadcast: Config().slack.roomBroadcast,
 			callbacks: {
 				canNotifyRoom: async () => true,
 				getUserId: async (mxid: string) => {
