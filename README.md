@@ -1,3 +1,5 @@
+**THIS PROJECT HAS BEEN MIGRATED OVER TO GITLAB: [mx-puppet-bridge](https://gitlab.com/mx-puppet/slack/mx-puppet-slack)**
+
 [![Support room on Matrix](https://img.shields.io/matrix/mx-puppet-bridge:sorunome.de.svg?label=%23mx-puppet-bridge%3Asorunome.de&logo=matrix&server_fqdn=sorunome.de)](https://matrix.to/#/#mx-puppet-bridge:sorunome.de)[![donate](https://liberapay.com/assets/widgets/donate.svg)](https://liberapay.com/Sorunome/donate)
 
 # mx-puppet-slack
